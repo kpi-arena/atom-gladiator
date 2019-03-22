@@ -5,6 +5,7 @@ import {
   LanguageServerProcess,
   LanguageClientConnection,
 } from 'atom-languageclient';
+import { UIpanel } from './ui-panel';
 
 class GladiatorConfClient extends AutoLanguageClient {
   constructor() {
@@ -43,3 +44,5 @@ class GladiatorConfClient extends AutoLanguageClient {
 }
 
 module.exports = new GladiatorConfClient
+const panel = new UIpanel();
+panel.createPanel();
