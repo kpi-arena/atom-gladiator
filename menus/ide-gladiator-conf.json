@@ -1,0 +1,26 @@
+{
+  "context-menu": {
+    "atom-text-editor": [
+      {
+        "label": "Toggle ide-gladiator-conf",
+        "command": "ide-gladiator-conf:toggle"
+      }
+    ]
+  },
+  "menu": [
+    {
+      "label": "Packages",
+      "submenu": [
+        {
+          "label": "ide-gladiator-conf",
+          "submenu": [
+            {
+              "label": "Toggle",
+              "command": "ide-gladiator-conf:toggle"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
