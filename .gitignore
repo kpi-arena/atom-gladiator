@@ -1,3 +1,9 @@
 .DS_Store
 npm-debug.log
 node_modules
+
+*.js
+!./lib/ide-gladiator-conf-view.js
+!./lib/ide-gladiator-conf.js
+!./spec/ide-gladiator-conf-spec.js
+!./spec/ide-gladiator-conf-view-spec.js

@@ -11,11 +11,21 @@
   "repository": "https://git.kpi.fei.tuke.sk/rk740eq/ide-gladiator-conf",
   "license": "MIT",
   "engines": {
-    "atom": ">=1.0.0 <2.0.0"
+    "atom": ">=1.0.0 <2.0.0",
+    "node": "*"
+  },
+  "scripts": {
+    "build": "tsc"
   },
   "dependencies": {
     "atom-languageclient": "^0.9.9",
     "yaml-language-server": "^0.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^11.11.5",
+    "prettier": "^1.16.4",
+    "tslint": "^5.14.0",
+    "typescript": "^3.3.4000"
   },
   "enhancedScopes": [
     "source.yaml",
