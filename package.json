@@ -15,7 +15,8 @@
     "node": "*"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "clean": "del-cli ./lib/*.js"
   },
   "dependencies": {
     "atom-languageclient": "^0.9.9",
