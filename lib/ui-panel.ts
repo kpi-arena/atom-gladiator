@@ -1,5 +1,3 @@
-import { ViewRegistry, Workspace } from 'atom';
-
 export class UIpanel {
   public createPanel() {
     const bottomDock = atom.workspace.getBottomDock();
@@ -15,17 +13,20 @@ export class UIpanel {
 
     const inside = document.createElement('div');
     inside.setAttribute('id', 'randomdiv');
-    
+
     const schemaInput = document.createElement('input');
     schemaInput.setAttribute('type', 'text');
     schemaInput.setAttribute('id', 'schemaAddress');
     schemaInput.setAttribute('class', 'native-key-bindings');
+    schemaInput.setAttribute('style', 'background: yellow');
 
     const schemaButton = document.createElement('button');
     schemaButton.innerHTML = 'SUBMIT';
     schemaButton.addEventListener('click', () => {
-        const inputField = document.getElementById('randomdiv');
-        console.log(inputField);
+      /* const inputField = document.getElementById('randomdiv');
+      console.log(inputField); */
+      const pane = bottomDock.getPanes();
+      console.log(pane);
     });
 
     inside.appendChild(schemaInput);
