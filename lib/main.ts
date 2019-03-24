@@ -1,10 +1,10 @@
-import path from 'path';
 import {
   AutoLanguageClient,
   ConnectionType,
-  LanguageServerProcess,
   LanguageClientConnection,
+  LanguageServerProcess,
 } from 'atom-languageclient';
+import path from 'path';
 import { UIpanel } from './ui-panel';
 
 class GladiatorConfClient extends AutoLanguageClient {
@@ -12,23 +12,23 @@ class GladiatorConfClient extends AutoLanguageClient {
     super();
   }
 
-  getGrammarScopes(): string[] {
+  public getGrammarScopes(): string[] {
     return ['source.yaml', 'source.yml'];
   }
 
-  getLanguageName(): string {
+  public getLanguageName(): string {
     return 'YAML';
   }
 
-  getServerName(): string {
-      return 'YAML lint';
+  public getServerName(): string {
+    return 'YAML lint';
   }
 
-  getConnectionType(): ConnectionType {
+  public getConnectionType(): ConnectionType {
     return 'stdio';
   }
 
-  startServerProcess(): LanguageServerProcess {
+  public startServerProcess(): LanguageServerProcess {
     return super.spawnChildNode([
       path.join(
         __dirname,
@@ -38,11 +38,11 @@ class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  preInitialization(connection: LanguageClientConnection): void {
-      connection.onCustom('$/partialResult', () => {});
+  public preInitialization(connection: LanguageClientConnection): void {
+    connection.onCustom('$/partialResult', () => {});
   }
 }
 
-module.exports = new GladiatorConfClient
+module.exports = new GladiatorConfClient();
 const panel = new UIpanel();
 panel.createPanel();

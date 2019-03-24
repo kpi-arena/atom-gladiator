@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "atom-languageclient": "^0.9.9",
+    "etch": "^0.14.0",
     "yaml-language-server": "^0.3.2"
   },
   "devDependencies": {
