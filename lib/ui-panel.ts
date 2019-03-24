@@ -1,4 +1,5 @@
 import { TextBuffer, TextEditor } from 'atom';
+import server from './main';
 
 const etch = require('etch');
 const $ = etch.dom;
@@ -30,17 +31,14 @@ export class UIpanel {
     const schemaButton = document.createElement('button');
     schemaButton.innerHTML = 'SUBMIT';
     schemaButton.addEventListener('click', () => {
-      const inputField = document.getElementById('schemaAddress');
-      console.log(inputField);
-      const pane = bottomDock.getPanes();
-      console.log(pane);
+      server.sendSettings();
     });
 
     inside.appendChild(schemaInput);
     inside.appendChild(schemaButton);
 
     atom.workspace.open({
-      element: new MyComponent({ props: 'lol' }, { children: 'lol' }),
+      element: inside,
       getTitle: () => 'Gladiator conf',
       getURI: () => 'atom://ide-gladiator-conf/my-item',
       getDefaultLocation: () => 'bottom',
