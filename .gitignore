@@ -4,7 +4,3 @@ node_modules
 
 *.js
 *.js.map
-!./lib/ide-gladiator-conf-view.js
-!./lib/ide-gladiator-conf.js
-!./spec/ide-gladiator-conf-spec.js
-!./spec/ide-gladiator-conf-view-spec.js
