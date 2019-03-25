@@ -144,7 +144,7 @@ module.exports = server;
 
 export default server;
 
-// const panel = new UIpanel();
-// panel.createPanel();
+const panel = new UIpanel();
+panel.createPanel();
 
 // atom.config.set('core.debugLSP', true);
