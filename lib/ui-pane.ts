@@ -1,50 +1,46 @@
 import { TextBuffer, TextEditor } from 'atom';
-import server from './main';
 
 const etch = require('etch');
 const $ = etch.dom;
 
-export class UIpanel {
-  public createPanel() {
-    const comp = new ArenaPane();
+export function createPane() {
+  const comp = new ArenaPane();
 
-    atom.workspace.open({
-      element: comp.element,
-      getTitle: () => 'Gladiator conf',
-      getURI: () => 'atom://ide-gladiator-conf/my-item',
-      getDefaultLocation: () => 'bottom',
-      getAllowedLocations: () => ['bottom', 'right'],
-    });
-  }
+  atom.workspace.open({
+    element: comp.element,
+    getTitle: () => 'Gladiator conf',
+    getURI: () => 'atom://ide-gladiator-conf/arena-pane',
+    getDefaultLocation: () => 'bottom',
+    getAllowedLocations: () => ['bottom'],
+  });
 }
 
 class ArenaPane {
+  /* These variables need to be defined, because they are used later, but tsc
+  would throw error. */
   public element: any;
   public refs: any;
-  // Required: Define an ordinary constructor to initialize your component.
+
   constructor() {
     // perform custom initialization here...
     // then call `etch.initialize`:
     etch.initialize(this);
 
-    this.refs.submitURLButton.addEventListener('click', () => {console.log(this.getText())});
+    this.refs.submitURLButton.addEventListener('click', () => {
+      this.loadSchema();
+    });
   }
 
-  // Optional: Destroy the component. Async/await syntax is pretty but optional.
   public async destroy() {
     // call etch.destroy to remove the element and destroy child components
     await etch.destroy(this);
     // then perform custom teardown logic here...
   }
 
-  public getText() {
-    return this.refs.findEditor.getText();
-  }
-
-  // Required: The `render` method returns a virtual DOM tree representing the
-  // current state of the component. Etch will call `render` to build and update
-  // the component's associated DOM element. Babel is instructed to call the
-  // `etch.dom` helper in compiled JSX expressions by the `@jsx` pragma above.
+  /* Required: The `render` method returns a virtual DOM tree representing the
+  current state of the component. Etch will call `render` to build and update
+  the component's associated DOM element. Babel is instructed to call the
+  `etch.dom` helper in compiled JSX expressions by the `@jsx` pragma above. */
   public render() {
     return $.div(
       { tabIndex: -1, className: 'find-and-replace' },
@@ -75,7 +71,10 @@ class ArenaPane {
           { className: 'input-block-item' },
           $.div(
             { className: 'btn-group btn-group-find' },
-            $.button({ ref: 'submitURLButton', className: 'btn btn-next' }, 'Submit'),
+            $.button(
+              { ref: 'submitURLButton', className: 'btn btn-next' },
+              'Submit',
+            ),
           ),
 
           $.div(
@@ -90,10 +89,17 @@ class ArenaPane {
     );
   }
 
-  // Required: Update the component with new properties and children.
-  public update(props: any, children: any) {
+  public update() {
     // perform custom update logic here...
     // then call `etch.update`, which is async and returns a promise
     return etch.update(this);
+  }
+
+  public loadSchema() {
+    const schemaURL: string = this.refs.findEditor.getText();
+
+    if (schemaURL.length === 0) {
+      return;
+    }
   }
 }

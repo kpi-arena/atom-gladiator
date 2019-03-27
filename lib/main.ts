@@ -1,150 +1,79 @@
-import { TextEditor } from 'atom';
-import {
-  ActiveServer,
-  AutoLanguageClient,
-  ConnectionType,
-  LanguageClientConnection,
-  LanguageServerProcess,
-} from 'atom-languageclient';
-import path from 'path';
-import { UIpanel } from './ui-panel';
+import { CompositeDisposable } from 'atom';
+import { createPane } from './ui-pane';
 
-class GladiatorConfClient extends AutoLanguageClient {
-  private _connection: LanguageClientConnection | null = null;
+let pane: any | null = null;
+// let subscriptions: CompositeDisposable;
 
-  constructor() {
-    super();
-  }
+export default {
+  pane,
+  subscriptions: new CompositeDisposable(),
 
-  public getGrammarScopes(): string[] {
-    return ['source.yaml', 'source.yml'];
-  }
+  activate(state: any) {
+    // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
+    this.subscriptions = new CompositeDisposable();
+    console.log('hello');
+    if (
+      atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane') ===
+      undefined
+    ) {
+      createPane();
+    }
 
-  public getLanguageName(): string {
-    return 'YAML';
-  }
+    // Register command that toggles this view
+    this.subscriptions.add(
+      atom.commands.add('atom-workspace', {
+        'ide-gladiator-conf:toggle': () => this.toggle(),
+      }),
 
-  public getServerName(): string {
-    return 'YAML lint';
-  }
-
-  public getConnectionType(): ConnectionType {
-    return 'stdio';
-  }
-
-  public startServerProcess(): LanguageServerProcess {
-    return super.spawnChildNode([
-      path.join(
-        __dirname,
-        '../node_modules/yaml-language-server/out/server/src/server.js',
-      ),
-      '--stdio',
-    ]) as LanguageServerProcess;
-  }
-
-  public sendSettings() {
-    if (this._connection !== null) {
-      this._connection.didChangeConfiguration({
-        settings: {
-          'yaml': {
-            'trace': {
-                'server': 'verbose'
-            },
-            'schemas': {
-                'https://arena.kpi.fei.tuke.sk/gladiator/api/v2/utils/schema/problemset-definition': '/*'
-            },
-            'format': {
-                'enable': false,
-                'singleQuote': false,
-                'bracketSpacing': true,
-                'proseWrap': 'preserve'
-            },
-            'validate': true,
-            'hover': true,
-            'completion': true,
-            'customTags': [],
-            'schemaStore': {
-                'enable': true
-            }
+      atom.commands.add('atom-workspace', {
+        'ide-gladiator-conf:show-ui': () => {
+          if (
+            atom.workspace.paneForURI(
+              'atom://ide-gladiator-conf/arena-pane',
+            ) === undefined
+          ) {
+            createPane();
           }
-        }
-      });
+        },
+      }),
+    );
+  },
+
+  deactivate() {
+    // pane.destroy();
+    // if (subscribe !== null) {
+    //   subscribe.dispose();
+    // }
+    // if (confView !== null) {
+    //   confView.destroy();
+    // }
+    if (this.subscriptions !== null) {
+      this.subscriptions.dispose();
     }
-  }
+  },
 
-  public sendSchema() {
-    let yamlTextEditor: TextEditor | null = null;
+  serialize(): any {
+    // if (confView !== null) {
+    //   return {
+    //     ideGladiatorConfViewState: confView.serialize(),
+    //   };
+    // }
+  },
 
-    atom.workspace.getTextEditors().forEach(textEditor => {
-      if (
-        textEditor
-          .getRootScopeDescriptor()
-          .getScopesArray()
-          .includes('source.yaml') ||
-        textEditor
-          .getRootScopeDescriptor()
-          .getScopesArray()
-          .includes('source.yml')
-      ) {
-        yamlTextEditor = textEditor;
-        return;
-      }
-    });
-    
-
-    if (yamlTextEditor !== null) {
-      this.getConnectionForEditor(yamlTextEditor).then( connection => {
-        if (connection !== null) {
-          connection.didChangeConfiguration({
-            settings: {
-              'yaml': {
-                'trace': {
-                    'server': 'verbose'
-                },
-                'schemas': {
-                    'https://arena.kpi.fei.tuke.sk/gladiator/api/v2/utils/schema/problemset-definition': '/*'
-                },
-                'format': {
-                    'enable': false,
-                    'singleQuote': false,
-                    'bracketSpacing': true,
-                    'proseWrap': 'preserve'
-                },
-                'validate': true,
-                'hover': true,
-                'completion': true,
-                'customTags': [],
-                'schemaStore': {
-                    'enable': true
-                }
-              }
-            }
-          });
-        }
-      });
+  toggle() {
+    // if (pane !== null) {
+    //   return pane.isVisible() ? pane.hide() : pane.show();
+    // }
+    console.log('hell yeah');
+    if (
+      atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane') ===
+      undefined
+    ) {
+      createPane();
     }
-  }
+  },
+};
 
-  public preInitialization(connection: LanguageClientConnection): void {
-    connection.onCustom('$/partialResult', () => {});
-  }
+// const client = new GladiatorConfClient();
 
-  public postInitialization(_server: ActiveServer): void {
-    super.postInitialization(_server);
-
-    this._connection = _server.connection;
-
-    this.sendSettings();
-  }
-}
-
-const server = new GladiatorConfClient();
-
-module.exports = server;
-
-export default server;
-
-const panel = new UIpanel();
-panel.createPanel();
-
-// atom.config.set('core.debugLSP', true);
+// module.exports = client;
