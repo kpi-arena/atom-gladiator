@@ -1,26 +1,18 @@
-import { CompositeDisposable } from 'atom';
+import { CompositeDisposable, Pane } from 'atom';
 import { createPane } from './ui-pane';
 
-let pane: any | null = null;
-// let subscriptions: CompositeDisposable;
+class Extension {
+  private readonly _subscriptions = new CompositeDisposable();
 
-export default {
-  pane,
-  subscriptions: new CompositeDisposable(),
+  // public initialize(state: ReturnType<Extension['serialize']>) {
+  //   return;
+  // }
 
-  activate(state: any) {
-    // Events subscribed to in atom's system can be easily cleaned up with a CompositeDisposable
-    this.subscriptions = new CompositeDisposable();
-    console.log('hello');
-    if (
-      atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane') ===
-      undefined
-    ) {
+  public activate(state: ReturnType<Extension['serialize']>) {
+    if (!atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')) {
       createPane();
     }
-
-    // Register command that toggles this view
-    this.subscriptions.add(
+    this._subscriptions.add(
       atom.commands.add('atom-workspace', {
         'ide-gladiator-conf:toggle': () => this.toggle(),
       }),
@@ -28,51 +20,35 @@ export default {
       atom.commands.add('atom-workspace', {
         'ide-gladiator-conf:show-ui': () => {
           if (
-            atom.workspace.paneForURI(
-              'atom://ide-gladiator-conf/arena-pane',
-            ) === undefined
+            !atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')
           ) {
             createPane();
           }
         },
       }),
     );
-  },
+  }
 
-  deactivate() {
-    // pane.destroy();
-    // if (subscribe !== null) {
-    //   subscribe.dispose();
-    // }
-    // if (confView !== null) {
-    //   confView.destroy();
-    // }
-    if (this.subscriptions !== null) {
-      this.subscriptions.dispose();
+  public serialize() {
+    return;
+  }
+
+  public deactivate() {
+    if (this._subscriptions !== null) {
+      this._subscriptions.dispose();
     }
-  },
+    return;
+  }
 
-  serialize(): any {
-    // if (confView !== null) {
-    //   return {
-    //     ideGladiatorConfViewState: confView.serialize(),
-    //   };
-    // }
-  },
-
-  toggle() {
-    // if (pane !== null) {
-    //   return pane.isVisible() ? pane.hide() : pane.show();
-    // }
+  private toggle() {
     console.log('hell yeah');
-    if (
-      atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane') ===
-      undefined
-    ) {
+    if (!atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')) {
       createPane();
     }
-  },
-};
+  }
+}
+
+module.exports = new Extension();
 
 // const client = new GladiatorConfClient();
 
