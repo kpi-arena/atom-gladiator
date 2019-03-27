@@ -1,12 +1,4 @@
 {
-  "context-menu": {
-    "atom-text-editor": [
-      {
-        "label": "Toggle ide-gladiator-conf",
-        "command": "ide-gladiator-conf:toggle"
-      }
-    ]
-  },
   "menu": [
     {
       "label": "Packages",
@@ -15,8 +7,16 @@
           "label": "ide-gladiator-conf",
           "submenu": [
             {
+              "label": "Show",
+              "command": "yaml-schema-interface:show"
+            },
+            {
+              "label": "Hide",
+              "command": "yaml-schema-interface:hide"
+            },
+            {
               "label": "Toggle",
-              "command": "ide-gladiator-conf:toggle"
+              "command": "yaml-schema-interface:toggle"
             }
           ]
         }

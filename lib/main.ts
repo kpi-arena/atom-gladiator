@@ -1,7 +1,8 @@
 import { CompositeDisposable, Pane } from 'atom';
-import { createPane } from './ui-pane';
+import { ArenaPane } from './ui';
 
 class Extension {
+  private readonly _pane = new ArenaPane();
   private readonly _subscriptions = new CompositeDisposable();
 
   // public initialize(state: ReturnType<Extension['serialize']>) {
@@ -9,28 +10,23 @@ class Extension {
   // }
 
   public activate(state: ReturnType<Extension['serialize']>) {
-    if (!atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')) {
-      createPane();
-    }
     this._subscriptions.add(
       atom.commands.add('atom-workspace', {
-        'ide-gladiator-conf:toggle': () => this.toggle(),
+        'yaml-schema-interface:toggle': () => this._pane.toggle()
       }),
 
       atom.commands.add('atom-workspace', {
-        'ide-gladiator-conf:show-ui': () => {
-          if (
-            !atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')
-          ) {
-            createPane();
-          }
-        },
+        'yaml-schema-interface:hide': () => this._pane.hide()
       }),
+
+      atom.commands.add('atom-workspace', {
+        'yaml-schema-interface:show': () => this._pane.show()
+      })
     );
   }
 
   public serialize() {
-    return;
+    return {};
   }
 
   public deactivate() {
@@ -38,13 +34,6 @@ class Extension {
       this._subscriptions.dispose();
     }
     return;
-  }
-
-  private toggle() {
-    console.log('hell yeah');
-    if (!atom.workspace.paneForURI('atom://ide-gladiator-conf/arena-pane')) {
-      createPane();
-    }
   }
 }
 

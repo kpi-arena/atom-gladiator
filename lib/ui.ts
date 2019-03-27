@@ -3,23 +3,13 @@ import { TextBuffer, TextEditor } from 'atom';
 const etch = require('etch');
 const $ = etch.dom;
 
-export function createPane() {
-  const comp = new ArenaPane();
-
-  atom.workspace.open({
-    element: comp.element,
-    getTitle: () => 'Gladiator conf',
-    getURI: () => 'atom://ide-gladiator-conf/arena-pane',
-    getDefaultLocation: () => 'bottom',
-    getAllowedLocations: () => ['bottom'],
-  });
-}
-
-class ArenaPane {
+export class ArenaPane {
   /* These variables need to be defined, because they are used later, but tsc
   would throw error. */
   public element: any;
   public refs: any;
+
+  private PANE_URI = 'atom://ide-gladiator-conf/arena-pane';
 
   constructor() {
     // perform custom initialization here...
@@ -29,6 +19,46 @@ class ArenaPane {
     this.refs.submitURLButton.addEventListener('click', () => {
       this.loadSchema();
     });
+  }
+
+  public show() {
+    const foundPane = atom.workspace.paneForURI(this.PANE_URI);
+
+    if (
+      !foundPane
+    ) {
+      atom.workspace.open({
+        element: this.element,
+        getTitle: () => 'YAML schema',
+        getURI: () => this.PANE_URI,
+        getDefaultLocation: () => 'bottom',
+        getAllowedLocations: () => ['bottom'],
+      });
+    } else {
+      foundPane.activate();
+    }
+  }
+
+  public hide() {
+    const foundPane = atom.workspace.paneForURI(this.PANE_URI);
+
+    if (foundPane) {
+      foundPane.destroy();
+    }
+
+    // TODO: show to the bottom dock after pane is destroyed.
+  }
+
+  public toggle() {
+    const foundPane = atom.workspace.paneForURI(this.PANE_URI);
+    
+    if (foundPane && !foundPane.isActive()) {
+      foundPane.activate();
+    } else if (foundPane) {
+      foundPane.destroy();
+    } else {
+      this.show();
+    }
   }
 
   public async destroy() {
