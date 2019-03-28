@@ -1,5 +1,7 @@
 import { TextBuffer, TextEditor } from 'atom';
+import { GladiatorConfClient } from './main';
 
+// tslint:disable-next-line: no-var-requires
 const etch = require('etch');
 const $ = etch.dom;
 
@@ -11,22 +13,20 @@ export class ArenaPane {
 
   private PANE_URI = 'atom://ide-gladiator-conf/arena-pane';
 
-  constructor() {
+  constructor(client: GladiatorConfClient) {
     // perform custom initialization here...
     // then call `etch.initialize`:
     etch.initialize(this);
 
-    this.refs.submitURLButton.addEventListener('click', () => {
-      this.loadSchema();
+    this.refs.loadSchemaButton.addEventListener('click', () => {
+      client.sendSchema(this.refs.findEditor.getText());
     });
   }
 
   public show() {
     const foundPane = atom.workspace.paneForURI(this.PANE_URI);
 
-    if (
-      !foundPane
-    ) {
+    if (!foundPane) {
       atom.workspace.open({
         element: this.element,
         getTitle: () => 'YAML schema',
@@ -51,7 +51,7 @@ export class ArenaPane {
 
   public toggle() {
     const foundPane = atom.workspace.paneForURI(this.PANE_URI);
-    
+
     if (foundPane && !foundPane.isActive()) {
       foundPane.activate();
     } else if (foundPane) {
@@ -73,13 +73,12 @@ export class ArenaPane {
   `etch.dom` helper in compiled JSX expressions by the `@jsx` pragma above. */
   public render() {
     return $.div(
-      { tabIndex: -1, className: 'find-and-replace' },
+      { tabIndex: -1, className: 'ide-gladiator-conf' },
       $.section(
-        { className: 'input-block find-container' },
+        { className: 'schema-input-wrapper' },
         $.div(
           {
-            className:
-              'input-block-item input-block-item--flex editor-container',
+            className: 'editor-container',
           },
           $(TextEditor, {
             ref: 'findEditor',
@@ -87,34 +86,17 @@ export class ArenaPane {
             placeholderText: 'Specify URL of the Arena server',
             buffer: new TextBuffer(),
           }),
-
-          $.div(
-            { className: 'find-meta-container' },
-            $.span({
-              ref: 'resultCounter',
-              className: 'text-subtle result-counter',
-            }),
-          ),
         ),
 
         $.div(
-          { className: 'input-block-item' },
-          $.div(
-            { className: 'btn-group btn-group-find' },
-            $.button(
-              { ref: 'submitURLButton', className: 'btn btn-next' },
-              'Submit',
-            ),
-          ),
-
-          $.div(
-            { className: 'btn-group btn-group-find-all' },
-            $.button(
-              { ref: 'findAllButton', className: 'btn btn-all' },
-              'Find All',
-            ),
+          { className: 'load-schema-btn-wrapper' },
+          $.button(
+            { ref: 'loadSchemaButton', className: 'btn load-schema-btn' },
+            'Load',
           ),
         ),
+
+        $.h2('TODO: finish UI'),
       ),
     );
   }
@@ -123,13 +105,5 @@ export class ArenaPane {
     // perform custom update logic here...
     // then call `etch.update`, which is async and returns a promise
     return etch.update(this);
-  }
-
-  public loadSchema() {
-    const schemaURL: string = this.refs.findEditor.getText();
-
-    if (schemaURL.length === 0) {
-      return;
-    }
   }
 }

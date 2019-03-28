@@ -1,44 +1,93 @@
-import { CompositeDisposable, Pane } from 'atom';
+import {
+  ActiveServer,
+  AutoLanguageClient,
+  ConnectionType,
+  LanguageClientConnection,
+  LanguageServerProcess,
+} from 'atom-languageclient';
+import path from 'path';
+
+import * as lifecycle from './extension-lifecycle';
+import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
 
-class Extension {
-  private readonly _pane = new ArenaPane();
-  private readonly _subscriptions = new CompositeDisposable();
+export class GladiatorConfClient extends AutoLanguageClient {
+  private _connection: LanguageClientConnection | null = null;
+  private _pane = new ArenaPane(this);
+  private _settings = getDefaultSettings();
 
-  // public initialize(state: ReturnType<Extension['serialize']>) {
-  //   return;
-  // }
+  // @ts-ignore
+  public activate(state: any) {
+    super.activate();
 
-  public activate(state: ReturnType<Extension['serialize']>) {
-    this._subscriptions.add(
-      atom.commands.add('atom-workspace', {
-        'yaml-schema-interface:toggle': () => this._pane.toggle()
-      }),
-
-      atom.commands.add('atom-workspace', {
-        'yaml-schema-interface:hide': () => this._pane.hide()
-      }),
-
-      atom.commands.add('atom-workspace', {
-        'yaml-schema-interface:show': () => this._pane.show()
-      })
-    );
+    lifecycle.activate(this._pane);
   }
 
   public serialize() {
-    return {};
+    return lifecycle.serialize();
   }
 
-  public deactivate() {
-    if (this._subscriptions !== null) {
-      this._subscriptions.dispose();
+  public deactivate(): Promise<any> {
+    lifecycle.deactivate();
+
+    return super.deactivate();
+  }
+
+  public preInitialization(connection: LanguageClientConnection): void {
+    connection.onCustom('$/partialResult', () => {});
+  }
+
+  public postInitialization(_server: ActiveServer): void {
+    super.postInitialization(_server);
+
+    this._connection = _server.connection;
+
+    this.sendSettings();
+  }
+
+  public getGrammarScopes(): string[] {
+    return ['source.yaml', 'source.yml'];
+  }
+
+  public getLanguageName(): string {
+    return 'YAML';
+  }
+
+  public getServerName(): string {
+    return 'YAML lint';
+  }
+
+  public getConnectionType(): ConnectionType {
+    return 'stdio';
+  }
+
+  public startServerProcess(): LanguageServerProcess {
+    return super.spawnChildNode([
+      path.join(
+        __dirname,
+        '../node_modules/yaml-language-server/out/server/src/server.js',
+      ),
+      '--stdio',
+    ]) as LanguageServerProcess;
+  }
+
+  public sendSchema(schema: string) {
+    if (schema.length === 0) {
+      return;
     }
-    return;
+
+    this._settings.settings.yaml.schemas = {
+      [schema]: '/*',
+    };
+
+    this.sendSettings();
+  }
+
+  private sendSettings() {
+    if (this._connection !== null) {
+      this._connection.didChangeConfiguration(this._settings);
+    }
   }
 }
 
-module.exports = new Extension();
-
-// const client = new GladiatorConfClient();
-
-// module.exports = client;
+module.exports = new GladiatorConfClient();
