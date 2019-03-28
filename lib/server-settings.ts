@@ -11,7 +11,9 @@ export interface IServerSettings {
       trace: {
         server: 'verbose';
       };
-      schemas: {};
+      schemas: {
+        [schema: string]: string;
+      };
       validate: boolean;
       hover: boolean;
       completion: boolean;

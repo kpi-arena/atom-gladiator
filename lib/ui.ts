@@ -106,4 +106,14 @@ export class ArenaPane {
     // then call `etch.update`, which is async and returns a promise
     return etch.update(this);
   }
+
+  public isActive(): boolean {
+    const foundPane = atom.workspace.paneForURI(this.PANE_URI);
+
+    if (!foundPane) {
+      return false;
+    }
+
+    return foundPane.isActive();
+  }
 }

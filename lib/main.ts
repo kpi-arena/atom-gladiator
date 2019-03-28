@@ -7,6 +7,7 @@ import {
 } from 'atom-languageclient';
 import path from 'path';
 
+import { IClientState } from './client-state';
 import * as lifecycle from './extension-lifecycle';
 import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
@@ -17,14 +18,25 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _settings = getDefaultSettings();
 
   // @ts-ignore
-  public activate(state: any) {
+  public activate(state: IClientState) {
     super.activate();
+
+    if (state.serverSettings) {
+      this._settings = state.serverSettings;
+    }
+
+    if (state.isPaneActive) {
+      this._pane.show();
+    }
 
     lifecycle.activate(this._pane);
   }
 
-  public serialize() {
-    return lifecycle.serialize();
+  public serialize(): IClientState {
+    return {
+      isPaneActive: this._pane.isActive(),
+      serverSettings: this._settings,
+    };
   }
 
   public deactivate(): Promise<any> {
@@ -33,9 +45,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
     return super.deactivate();
   }
 
-  public preInitialization(connection: LanguageClientConnection): void {
-    connection.onCustom('$/partialResult', () => {});
-  }
+  // public preInitialization(connection: LanguageClientConnection): void {
+  //   connection.onCustom('$/partialResult', () => {});
+  // }
 
   public postInitialization(_server: ActiveServer): void {
     super.postInitialization(_server);

@@ -19,10 +19,6 @@ export function activate(pane: ArenaPane) {
   );
 }
 
-export function serialize() {
-  return {};
-}
-
 export function deactivate() {
   if (subscriptions !== null) {
     subscriptions.dispose();
