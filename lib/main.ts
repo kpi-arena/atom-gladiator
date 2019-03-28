@@ -1,4 +1,3 @@
-import { TextEditor } from 'atom';
 import {
   ActiveServer,
   AutoLanguageClient,
@@ -7,13 +6,55 @@ import {
   LanguageServerProcess,
 } from 'atom-languageclient';
 import path from 'path';
-import { UIpanel } from './ui-panel';
 
-class GladiatorConfClient extends AutoLanguageClient {
+import { IClientState } from './client-state';
+import * as lifecycle from './extension-lifecycle';
+import { getDefaultSettings, IServerSettings } from './server-settings';
+import { ArenaPane } from './ui';
+
+export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
+  private _pane = new ArenaPane(this);
+  private _settings = getDefaultSettings();
 
-  constructor() {
-    super();
+  // @ts-ignore
+  public activate(state: IClientState) {
+    super.activate();
+
+    if (state.serverSettings) {
+      this._settings = state.serverSettings;
+    }
+
+    if (state.isPaneActive) {
+      this._pane.show();
+    }
+
+    lifecycle.activate(this._pane);
+  }
+
+  public serialize(): IClientState {
+    return {
+      isPaneActive: this._pane.isActive(),
+      serverSettings: this._settings,
+    };
+  }
+
+  public deactivate(): Promise<any> {
+    lifecycle.deactivate();
+
+    return super.deactivate();
+  }
+
+  // public preInitialization(connection: LanguageClientConnection): void {
+  //   connection.onCustom('$/partialResult', () => {});
+  // }
+
+  public postInitialization(_server: ActiveServer): void {
+    super.postInitialization(_server);
+
+    this._connection = _server.connection;
+
+    this.sendSettings();
   }
 
   public getGrammarScopes(): string[] {
@@ -42,109 +83,23 @@ class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  public sendSettings() {
-    if (this._connection !== null) {
-      this._connection.didChangeConfiguration({
-        settings: {
-          'yaml': {
-            'trace': {
-                'server': 'verbose'
-            },
-            'schemas': {
-                'https://arena.kpi.fei.tuke.sk/gladiator/api/v2/utils/schema/problemset-definition': '/*'
-            },
-            'format': {
-                'enable': false,
-                'singleQuote': false,
-                'bracketSpacing': true,
-                'proseWrap': 'preserve'
-            },
-            'validate': true,
-            'hover': true,
-            'completion': true,
-            'customTags': [],
-            'schemaStore': {
-                'enable': true
-            }
-          }
-        }
-      });
+  public sendSchema(schema: string) {
+    if (schema.length === 0) {
+      return;
     }
-  }
 
-  public sendSchema() {
-    let yamlTextEditor: TextEditor | null = null;
-
-    atom.workspace.getTextEditors().forEach(textEditor => {
-      if (
-        textEditor
-          .getRootScopeDescriptor()
-          .getScopesArray()
-          .includes('source.yaml') ||
-        textEditor
-          .getRootScopeDescriptor()
-          .getScopesArray()
-          .includes('source.yml')
-      ) {
-        yamlTextEditor = textEditor;
-        return;
-      }
-    });
-    
-
-    if (yamlTextEditor !== null) {
-      this.getConnectionForEditor(yamlTextEditor).then( connection => {
-        if (connection !== null) {
-          connection.didChangeConfiguration({
-            settings: {
-              'yaml': {
-                'trace': {
-                    'server': 'verbose'
-                },
-                'schemas': {
-                    'https://arena.kpi.fei.tuke.sk/gladiator/api/v2/utils/schema/problemset-definition': '/*'
-                },
-                'format': {
-                    'enable': false,
-                    'singleQuote': false,
-                    'bracketSpacing': true,
-                    'proseWrap': 'preserve'
-                },
-                'validate': true,
-                'hover': true,
-                'completion': true,
-                'customTags': [],
-                'schemaStore': {
-                    'enable': true
-                }
-              }
-            }
-          });
-        }
-      });
-    }
-  }
-
-  public preInitialization(connection: LanguageClientConnection): void {
-    connection.onCustom('$/partialResult', () => {});
-  }
-
-  public postInitialization(_server: ActiveServer): void {
-    super.postInitialization(_server);
-
-    this._connection = _server.connection;
+    this._settings.settings.yaml.schemas = {
+      [schema]: '/*',
+    };
 
     this.sendSettings();
   }
+
+  private sendSettings() {
+    if (this._connection !== null) {
+      this._connection.didChangeConfiguration(this._settings);
+    }
+  }
 }
 
-const server = new GladiatorConfClient();
-
-module.exports = server;
-
-export default server;
-
-// const panel = new UIpanel();
-// panel.createPanel();
-
-// atom.config.set('core.debugLSP', true);
+module.exports = new GladiatorConfClient();
