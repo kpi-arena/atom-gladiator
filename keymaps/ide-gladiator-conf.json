@@ -1,5 +1,5 @@
 {
   "atom-workspace": {
-    "ctrl-alt-o": "ide-gladiator-conf:toggle"
+    "ctrl-alt-o": "yaml-schema-interface:toggle"
   }
 }
