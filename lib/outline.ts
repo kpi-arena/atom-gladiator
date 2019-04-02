@@ -3,6 +3,7 @@ import { Outline, OutlineTree, TokenKind } from 'atom-ide';
 import {
   Kind,
   load,
+  YAMLAnchorReference,
   YamlMap,
   YAMLMapping,
   YAMLNode,
@@ -23,10 +24,10 @@ export class OutlineBuilder {
     return new Promise((resolve, reject) => {
       const yamlDoc = load(editor.getBuffer().getText());
 
-      // console.log(yamlDoc);
+      console.log(yamlDoc);
 
       resolve({
-        outlineTrees: this.parseYamlMap(yamlDoc as YamlMap, editor)[0],
+        outlineTrees: this.parseYamlNode(yamlDoc as YamlMap, editor)[0],
       });
     });
   }
@@ -40,6 +41,11 @@ export class OutlineBuilder {
     }
 
     switch (node.kind) {
+      case Kind.ANCHOR_REF:
+        return this.parseYamlAnchorReference(
+          node as YAMLAnchorReference,
+          editor,
+        );
       case Kind.MAP:
         return this.parseYamlMap(node as YamlMap, editor);
       case Kind.MAPPING:
@@ -51,6 +57,13 @@ export class OutlineBuilder {
       default:
         return [[], 0];
     }
+  }
+
+  private parseYamlAnchorReference(
+    node: YAMLAnchorReference,
+    editor: TextEditor,
+  ): [OutlineTree[], number] {
+    return this.parseYamlNode(node.value, editor);
   }
 
   private parseYamlMap(
@@ -114,12 +127,15 @@ export class OutlineBuilder {
 
       result[1] += testInfo[2] + childrenTuple[1];
 
-      const tokenText = result[0].push({
+      result[0].push({
         tokenizedText: [
           {
             kind: testInfo[1],
             value:
-              testInfo[0] + (testInfo[2] > 0 ? ' (' + testInfo[2] + ')' : ''),
+              testInfo[0] +
+              (testInfo[2] + childrenTuple[1] > 0
+                ? ' (' + (testInfo[2] + childrenTuple[1]) + ')'
+                : ''),
           },
         ],
         startPosition: editor
@@ -158,8 +174,14 @@ export class OutlineBuilder {
     return '';
   }
 
-  private getTestInfo(node: YAMLNode): [string, TokenKind, number] {
-    if (node.kind !== Kind.MAP) {
+  private getTestInfo(actualNode: YAMLNode): [string, TokenKind, number] {
+    let node: YAMLNode;
+
+    if (actualNode.kind === Kind.MAP) {
+      node = actualNode as YamlMap;
+    } else if (actualNode.kind === Kind.ANCHOR_REF) {
+      node = actualNode.value as YAMLNode;
+    } else {
       return ['', 'plain', 0];
     }
 

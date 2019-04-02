@@ -8,12 +8,12 @@ import {
 } from 'atom-languageclient';
 import path from 'path';
 
+import { Point, TextEditor } from 'atom';
 import { IClientState } from './client-state';
 import * as lifecycle from './extension-lifecycle';
+import { OutlineBuilder } from './outline';
 import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
-import { TextEditor, Point } from 'atom';
-import { OutlineBuilder } from './outline';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
@@ -134,44 +134,44 @@ export class GladiatorConfClient extends AutoLanguageClient {
     return builder.getOutline(editor);
   }
 
-  private recursiveOutlineSearch(
-    tree: atomIde.OutlineTree,
-    lines: string[],
-  ): number {
-    const regEx = new RegExp('score( |\t)*:( |\t)*[0-9]*');
+  // private recursiveOutlineSearch(
+  //   tree: atomIde.OutlineTree,
+  //   lines: string[],
+  // ): number {
+  //   const regEx = new RegExp('score( |\t)*:( |\t)*[0-9]*');
 
-    let score = 0;
+  //   let score = 0;
 
-    if (regEx.test(lines[tree.startPosition.row])) {
-      const scoreString = lines[tree.startPosition.row].match(
-        new RegExp('[0-9]{1,}', 'g'),
-      );
+  //   if (regEx.test(lines[tree.startPosition.row])) {
+  //     const scoreString = lines[tree.startPosition.row].match(
+  //       new RegExp('[0-9]{1,}', 'g'),
+  //     );
 
-      if (scoreString === null) {
-        return score;
-      }
+  //     if (scoreString === null) {
+  //       return score;
+  //     }
 
-      console.log(scoreString);
+  //     console.log(scoreString);
 
-      score = parseInt(scoreString[0], 10);
-    }
+  //     score = parseInt(scoreString[0], 10);
+  //   }
 
-    tree.children.forEach(subTree => {
-      score += this.recursiveOutlineSearch(subTree, lines);
-    });
+  //   tree.children.forEach(subTree => {
+  //     score += this.recursiveOutlineSearch(subTree, lines);
+  //   });
 
-    const teskRegex = new RegExp('tasks');
+  //   const teskRegex = new RegExp('tasks');
 
-    if (
-      tree.tokenizedText !== undefined &&
-      teskRegex.test(lines[tree.startPosition.row])
-    ) {
-      tree.tokenizedText[0].value =
-        tree.tokenizedText[0].value + ' (' + score + ')';
-    }
+  //   if (
+  //     tree.tokenizedText !== undefined &&
+  //     teskRegex.test(lines[tree.startPosition.row])
+  //   ) {
+  //     tree.tokenizedText[0].value =
+  //       tree.tokenizedText[0].value + ' (' + score + ')';
+  //   }
 
-    return score;
-  }
+  //   return score;
+  // }
 
   private sendSettings() {
     if (this._connection !== null) {
