@@ -1,3 +1,4 @@
+import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
   AutoLanguageClient,
@@ -11,6 +12,8 @@ import { IClientState } from './client-state';
 import * as lifecycle from './extension-lifecycle';
 import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
+import { TextEditor, Point } from 'atom';
+import { OutlineBuilder } from './outline';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
@@ -20,6 +23,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
+
+    atom.config.set('core.debugLSP', false);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -93,6 +98,79 @@ export class GladiatorConfClient extends AutoLanguageClient {
     };
 
     this.sendSettings();
+  }
+
+  public getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
+    // return super.getOutline(editor).then(outlineTree => {
+    //   if (outlineTree === null) {
+    //     return outlineTree;
+    //   }
+
+    //   // let score = 0;
+    //   const lines = editor.getBuffer().getLines();
+
+    //   outlineTree.outlineTrees.forEach(tree => {
+    //     if (!tree.children) {
+    //       return;
+    //     }
+
+    //     const score = this.recursiveOutlineSearch(tree, lines);
+
+    //     if (tree.plainText && tree.plainText.match(new RegExp('t'))) {
+    //       tree.plainText = tree.plainText + ' (' + score + ')';
+    //     } else if (tree.tokenizedText) {
+    //       tree.tokenizedText[0].value =
+    //         tree.tokenizedText[0].value + ' (' + score + ')';
+    //     }
+    //   });
+
+    //   console.log('score');
+    //   //console.log(score);
+    //   console.log(outlineTree);
+
+    //   return outlineTree;
+    // });
+    const builder = new OutlineBuilder();
+    return builder.getOutline(editor);
+  }
+
+  private recursiveOutlineSearch(
+    tree: atomIde.OutlineTree,
+    lines: string[],
+  ): number {
+    const regEx = new RegExp('score( |\t)*:( |\t)*[0-9]*');
+
+    let score = 0;
+
+    if (regEx.test(lines[tree.startPosition.row])) {
+      const scoreString = lines[tree.startPosition.row].match(
+        new RegExp('[0-9]{1,}', 'g'),
+      );
+
+      if (scoreString === null) {
+        return score;
+      }
+
+      console.log(scoreString);
+
+      score = parseInt(scoreString[0], 10);
+    }
+
+    tree.children.forEach(subTree => {
+      score += this.recursiveOutlineSearch(subTree, lines);
+    });
+
+    const teskRegex = new RegExp('tasks');
+
+    if (
+      tree.tokenizedText !== undefined &&
+      teskRegex.test(lines[tree.startPosition.row])
+    ) {
+      tree.tokenizedText[0].value =
+        tree.tokenizedText[0].value + ' (' + score + ')';
+    }
+
+    return score;
   }
 
   private sendSettings() {
