@@ -1,6 +1,6 @@
 {
   "name": "ide-gladiator-conf",
-  "main": "./lib/main.js",
+  "main": "./build/main.js",
   "version": "0.0.0",
   "description": "Atom IDE implementation of gladiator-conf-language-server ",
   "keywords": [
@@ -21,6 +21,7 @@
   "dependencies": {
     "atom-languageclient": "^0.9.9",
     "etch": "^0.14.0",
+    "vscode-languageserver-protocol": "^3.15.0-next.1",
     "yaml-ast-parser": "0.0.43",
     "yaml-language-server": "^0.3.2"
   },
