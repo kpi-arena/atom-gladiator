@@ -1,25 +1,33 @@
+import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
   AutoLanguageClient,
   ConnectionType,
+  Convert,
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
+import * as ac from 'atom/autocomplete-plus';
 import path from 'path';
 
+import { Point, TextEditor } from 'atom';
 import { IClientState } from './client-state';
 import * as lifecycle from './extension-lifecycle';
+import { OutlineBuilder } from './outline';
 import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
+  private _outlineBuilder = new OutlineBuilder();
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
 
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
+
+    atom.config.set('core.debugLSP', false);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -94,6 +102,28 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     this.sendSettings();
   }
+
+  protected getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
+    return this._outlineBuilder.getOutline(editor);
+  }
+
+  // protected getSuggestions(
+  //   request: ac.SuggestionsRequestedEvent,
+  // ): Promise<ac.AnySuggestion[]> {
+  //   return new Promise((resolve, reject) => {
+  //     // const res: ac.AnySuggestion[] = [{ text: 'yeah' }, { text: 'boi' }];
+
+  //     if (this._connection !== null) {
+  //       this._connection.completion({
+  //         textDocument: Convert.editorToTextDocumentIdentifier(request.editor),
+  //         position: Convert.pointToPosition(request.bufferPosition),
+  //         context:
+  //       });
+  //     }
+
+  //     resolve(res);
+  //   });
+  // }
 
   private sendSettings() {
     if (this._connection !== null) {
