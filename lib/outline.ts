@@ -24,7 +24,7 @@ export class OutlineBuilder {
     return new Promise((resolve, reject) => {
       const yamlDoc = load(editor.getBuffer().getText());
 
-      console.log(yamlDoc);
+      // console.log(yamlDoc);
 
       resolve({
         outlineTrees: this.parseYamlNode(yamlDoc as YamlMap, editor)[0],

@@ -3,9 +3,11 @@ import {
   ActiveServer,
   AutoLanguageClient,
   ConnectionType,
+  Convert,
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
+import * as ac from 'atom/autocomplete-plus';
 import path from 'path';
 
 import { Point, TextEditor } from 'atom';
@@ -17,6 +19,7 @@ import { ArenaPane } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
+  private _outlineBuilder = new OutlineBuilder();
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
 
@@ -100,77 +103,26 @@ export class GladiatorConfClient extends AutoLanguageClient {
     this.sendSettings();
   }
 
-  public getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
-    // return super.getOutline(editor).then(outlineTree => {
-    //   if (outlineTree === null) {
-    //     return outlineTree;
-    //   }
-
-    //   // let score = 0;
-    //   const lines = editor.getBuffer().getLines();
-
-    //   outlineTree.outlineTrees.forEach(tree => {
-    //     if (!tree.children) {
-    //       return;
-    //     }
-
-    //     const score = this.recursiveOutlineSearch(tree, lines);
-
-    //     if (tree.plainText && tree.plainText.match(new RegExp('t'))) {
-    //       tree.plainText = tree.plainText + ' (' + score + ')';
-    //     } else if (tree.tokenizedText) {
-    //       tree.tokenizedText[0].value =
-    //         tree.tokenizedText[0].value + ' (' + score + ')';
-    //     }
-    //   });
-
-    //   console.log('score');
-    //   //console.log(score);
-    //   console.log(outlineTree);
-
-    //   return outlineTree;
-    // });
-    const builder = new OutlineBuilder();
-    return builder.getOutline(editor);
+  protected getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
+    return this._outlineBuilder.getOutline(editor);
   }
 
-  // private recursiveOutlineSearch(
-  //   tree: atomIde.OutlineTree,
-  //   lines: string[],
-  // ): number {
-  //   const regEx = new RegExp('score( |\t)*:( |\t)*[0-9]*');
+  // protected getSuggestions(
+  //   request: ac.SuggestionsRequestedEvent,
+  // ): Promise<ac.AnySuggestion[]> {
+  //   return new Promise((resolve, reject) => {
+  //     // const res: ac.AnySuggestion[] = [{ text: 'yeah' }, { text: 'boi' }];
 
-  //   let score = 0;
-
-  //   if (regEx.test(lines[tree.startPosition.row])) {
-  //     const scoreString = lines[tree.startPosition.row].match(
-  //       new RegExp('[0-9]{1,}', 'g'),
-  //     );
-
-  //     if (scoreString === null) {
-  //       return score;
+  //     if (this._connection !== null) {
+  //       this._connection.completion({
+  //         textDocument: Convert.editorToTextDocumentIdentifier(request.editor),
+  //         position: Convert.pointToPosition(request.bufferPosition),
+  //         context:
+  //       });
   //     }
 
-  //     console.log(scoreString);
-
-  //     score = parseInt(scoreString[0], 10);
-  //   }
-
-  //   tree.children.forEach(subTree => {
-  //     score += this.recursiveOutlineSearch(subTree, lines);
+  //     resolve(res);
   //   });
-
-  //   const teskRegex = new RegExp('tasks');
-
-  //   if (
-  //     tree.tokenizedText !== undefined &&
-  //     teskRegex.test(lines[tree.startPosition.row])
-  //   ) {
-  //     tree.tokenizedText[0].value =
-  //       tree.tokenizedText[0].value + ' (' + score + ')';
-  //   }
-
-  //   return score;
   // }
 
   private sendSettings() {
