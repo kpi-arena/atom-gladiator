@@ -8,8 +8,8 @@ import {
   LanguageServerProcess,
 } from 'atom-languageclient';
 import * as ac from 'atom/autocomplete-plus';
-import path from 'path';
 import * as fs from 'fs';
+import path from 'path';
 
 import { CompositeDisposable, Point, TextEditor } from 'atom';
 import { Position, TextDocument } from 'vscode-languageserver-types';

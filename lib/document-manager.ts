@@ -1,14 +1,52 @@
 import { Convert } from 'atom-languageclient';
-import * as path from 'path';
-import * as lsp from 'vscode-languageserver-protocol';
-import { TextDocumentItem } from 'vscode-languageserver-types';
 import fs, { readFileSync } from 'fs';
-import { TextDocument } from 'vscode-languageserver-protocol';
+import * as path from 'path';
+import {
+  DidOpenTextDocumentParams,
+  TextDocument,
+} from 'vscode-languageserver-protocol';
 
 export class SuperDocument {
   // private _roots: Map<string, ConfDocument> = new Map();
 
-  public didOpen(request: lsp.DidOpenTextDocumentParams): TextDocument[] {
+  public getSuperDoc(
+    request: DidOpenTextDocumentParams,
+  ): DidOpenTextDocumentParams {
+    const docs = this.getDocuments(request);
+
+    const rootDoc = docs.get(
+      this.getRootPath(request.textDocument.text, request.textDocument.uri),
+    );
+
+    if (!rootDoc) {
+      return request;
+    }
+
+    // @ts-ignore
+    const rootLineOffsets: number[] = rootDoc.getLineOffsets();
+
+    const linesRelation: ILinesRelation[] = [];
+
+    let newText: string = '';
+
+    // TODO: add exception for rootLineOffsets of length 1
+    for (let index = 0; index < rootLineOffsets.length - 1; index++) {
+      const originalLine = rootDoc.getText({
+        start: rootDoc.positionAt(rootLineOffsets[index]),
+        end: rootDoc.positionAt(rootLineOffsets[index + 1]),
+      });
+
+      // if (originalLine)
+    }
+
+    console.log({ lol: newText });
+
+    return request;
+  }
+
+  private getDocuments(
+    request: DidOpenTextDocumentParams,
+  ): Map<string, TextDocument> {
     const rootPath = this.getRootPath(
       request.textDocument.text,
       request.textDocument.uri,
@@ -16,7 +54,7 @@ export class SuperDocument {
 
     let rootDocument: TextDocument | null = null;
 
-    /* In case rootDocument is equal to the document forom request. */
+    /* In case rootDocument is equal to the document from request. */
     if (rootPath === Convert.uriToPath(request.textDocument.uri)) {
       rootDocument = TextDocument.create(
         request.textDocument.uri,
@@ -55,11 +93,13 @@ export class SuperDocument {
       );
 
     const subDocumentPaths: Map<string, boolean> = new Map();
-    const subDocuments: TextDocument[] = [];
+    const documents: Map<string, TextDocument> = new Map();
+
+    documents.set(rootPath, rootDocument);
 
     if (!includesMatch) {
       // TODO handle exception
-      return subDocuments;
+      return documents;
     }
 
     includesMatch.forEach(match => {
@@ -82,11 +122,16 @@ export class SuperDocument {
       const editorPath = editor.getBuffer().getPath();
 
       /* Skipping file if it's not a YAML file saved on drive. */
-      if (!editorPath || !editorPath.match(/(\.yaml|\.yml)$/i)) {
+      if (
+        !editorPath ||
+        !editorPath.match(/(\.yaml|\.yml)$/i) ||
+        !subDocumentPaths.get(editorPath)
+      ) {
         return;
       }
 
-      subDocuments.push(
+      documents.set(
+        editorPath,
         TextDocument.create(
           editor.getBuffer().getUri(),
           'yaml',
@@ -108,7 +153,8 @@ export class SuperDocument {
         return;
       }
 
-      subDocuments.push(
+      documents.set(
+        subPath,
         TextDocument.create(
           Convert.pathToUri(subPath),
           'yaml',
@@ -118,11 +164,11 @@ export class SuperDocument {
       );
     });
 
-    return subDocuments;
+    return documents;
   }
 
   private getRootPath(text: string, uri: string): string {
-    const matchedComment = text.match(/.*/);
+    const matchedComment = text.match(/#root:\s*([^\n\r\s]*(\.yaml|\.yml))/i);
 
     if (!matchedComment || !matchedComment[1]) {
       return Convert.uriToPath(uri);
@@ -132,6 +178,12 @@ export class SuperDocument {
   }
 }
 
+interface ILinesRelation {
+  originLine: number;
+  originPath: string;
+  newDocLine: number;
+}
+// #root:\s*([^\n\r\s]*(\.yaml|\.yml))
 // interface TextDocumentItem {
 // 	/**
 // 	 * The text document's URI.

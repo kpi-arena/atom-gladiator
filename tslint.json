@@ -12,6 +12,7 @@
         "class-name": true,
         "max-classes-per-file": false,
         "no-implicit-dependencies": false,
+        "no-submodule-imports": [true, "atom/autocomplete-plus"],
         "object-literal-sort-keys": false,
         "quotemark": [
             true,
