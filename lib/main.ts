@@ -11,15 +11,15 @@ import * as ac from 'atom/autocomplete-plus';
 import path from 'path';
 import * as fs from 'fs';
 
-import { Point, TextEditor, CompositeDisposable } from 'atom';
+import { CompositeDisposable, Point, TextEditor } from 'atom';
+import { Position, TextDocument } from 'vscode-languageserver-types';
 import { IClientState } from './client-state';
+import { SuperConnection } from './connection';
+import { SuperDocument } from './document-manager';
 import * as lifecycle from './extension-lifecycle';
 import { OutlineBuilder } from './outline';
 import { getDefaultSettings, IServerSettings } from './server-settings';
 import { ArenaPane } from './ui';
-import { TextDocument, Position } from 'vscode-languageserver-types';
-import { SuperDocument } from './document-manager';
-import { SuperConnection } from './connection';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
@@ -184,7 +184,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
             }'`,
           );
           atom.notifications.addError(
-            // tslint:disable-next-line:max-line-length
             `The ${
               this.name
             } language server has exited and exceeded the restart limit for project '${

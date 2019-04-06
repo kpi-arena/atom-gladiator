@@ -81,7 +81,7 @@ export class SuperDocument {
     atom.workspace.getTextEditors().forEach(editor => {
       const editorPath = editor.getBuffer().getPath();
 
-      /* Skipping file if it's not a YAML fiile saved on drive. */
+      /* Skipping file if it's not a YAML file saved on drive. */
       if (!editorPath || !editorPath.match(/(\.yaml|\.yml)$/i)) {
         return;
       }
@@ -131,18 +131,6 @@ export class SuperDocument {
     return path.join(path.dirname(Convert.uriToPath(uri)), matchedComment[1]);
   }
 }
-
-const test = new SuperDocument();
-console.log(
-  test.didOpen({
-    textDocument: {
-      languageId: 'yaml',
-      uri: Convert.pathToUri(path.join(__dirname, '../test1.yaml')),
-      version: 0,
-      text: readFileSync(path.join(__dirname, '../test1.yaml')).toString(),
-    },
-  }),
-);
 
 // interface TextDocumentItem {
 // 	/**
