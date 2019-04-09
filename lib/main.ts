@@ -31,7 +31,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
   public activate(state: IClientState) {
     super.activate();
 
-    atom.config.set('core.debugLSP', true);
+    atom.config.set('core.debugLSP', false);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;

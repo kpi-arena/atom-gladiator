@@ -8,40 +8,74 @@ import {
 
 export class SuperDocument {
   // private _roots: Map<string, ConfDocument> = new Map();
+  private _newText: string = '';
+  private _docs: Map<string, TextDocument> = new Map();
+  private _linesRelation: ILinesRelation[] = [];
+  private _rootDirectory: string = '';
+  private _rootRegex = /#root:\s*([^\n\r\s]*(\.yaml|\.yml))/i;
 
   public getSuperDoc(
     request: DidOpenTextDocumentParams,
   ): DidOpenTextDocumentParams {
-    const docs = this.getDocuments(request);
+    this._docs = this.getDocuments(request);
 
-    const rootDoc = docs.get(
-      this.getRootPath(request.textDocument.text, request.textDocument.uri),
+    const rootPath = this.getRootPath(
+      request.textDocument.text,
+      request.textDocument.uri,
     );
+
+    const rootDoc = this._docs.get(rootPath);
 
     if (!rootDoc) {
       return request;
     }
 
-    // @ts-ignore
-    const rootLineOffsets: number[] = rootDoc.getLineOffsets();
+    this._rootDirectory = path.dirname(rootPath);
 
-    const linesRelation: ILinesRelation[] = [];
+    this.recursiveTextInsert(
+      rootDoc,
+      this.getRootPath(request.textDocument.text, request.textDocument.uri),
+    );
 
-    let newText: string = '';
-
-    // TODO: add exception for rootLineOffsets of length 1
-    for (let index = 0; index < rootLineOffsets.length - 1; index++) {
-      const originalLine = rootDoc.getText({
-        start: rootDoc.positionAt(rootLineOffsets[index]),
-        end: rootDoc.positionAt(rootLineOffsets[index + 1]),
-      });
-
-      // if (originalLine)
-    }
-
-    console.log({ lol: newText });
+    console.log(this._newText);
 
     return request;
+  }
+
+  private recursiveTextInsert(doc: TextDocument, docPath: string) {
+    // @ts-ignore
+    const docOffsets: number[] = doc.getLineOffsets();
+
+    for (let index = 0; index < docOffsets.length - 1; index++) {
+      const originalLine = doc.getText({
+        start: doc.positionAt(docOffsets[index]),
+        end: doc.positionAt(docOffsets[index + 1]),
+      });
+
+      if (originalLine.match(/#root:\s*([^\n\r\s]*(\.yaml|\.yml))/i)) {
+        continue;
+      }
+
+      const lineMatch = originalLine.match(
+        /^(\t|\cI|\x20)*#include:(\t|\cI|\x20)*([^\n\r\t\cI\x20]*(\.yaml|\.yml))(\t|\cI|\x20)*$/im,
+      );
+
+      if (lineMatch) {
+        const subDoc = this._docs.get(
+          path.join(this._rootDirectory, lineMatch[3]),
+        );
+
+        if (subDoc) {
+          this.recursiveTextInsert(subDoc, lineMatch[3]);
+        }
+      } else {
+        this._newText = this._newText.concat(originalLine);
+        this._linesRelation.push({
+          originLine: docOffsets[index],
+          originPath: path.join(this._rootDirectory, docPath),
+        });
+      }
+    }
   }
 
   private getDocuments(
@@ -168,7 +202,7 @@ export class SuperDocument {
   }
 
   private getRootPath(text: string, uri: string): string {
-    const matchedComment = text.match(/#root:\s*([^\n\r\s]*(\.yaml|\.yml))/i);
+    const matchedComment = text.match(this._rootRegex);
 
     if (!matchedComment || !matchedComment[1]) {
       return Convert.uriToPath(uri);
@@ -181,28 +215,4 @@ export class SuperDocument {
 interface ILinesRelation {
   originLine: number;
   originPath: string;
-  newDocLine: number;
 }
-// #root:\s*([^\n\r\s]*(\.yaml|\.yml))
-// interface TextDocumentItem {
-// 	/**
-// 	 * The text document's URI.
-// 	 */
-// 	uri: DocumentUri;
-
-// 	/**
-// 	 * The text document's language identifier.
-// 	 */
-// 	languageId: string;
-
-// 	/**
-// 	 * The version number of this document (it will increase after each
-// 	 * change, including undo/redo).
-// 	 */
-// 	version: number;
-
-// 	/**
-// 	 * The content of the opened text document.
-// 	 */
-// 	text: string;
-// }
