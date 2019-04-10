@@ -1,24 +1,18 @@
+import { CompositeDisposable, TextEditor } from 'atom';
 import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
   AutoLanguageClient,
   ConnectionType,
-  Convert,
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
-import * as ac from 'atom/autocomplete-plus';
-import * as fs from 'fs';
 import path from 'path';
-
-import { CompositeDisposable, Point, TextEditor } from 'atom';
-import { Position, TextDocument } from 'vscode-languageserver-types';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
-import { SuperDocument } from './document-manager';
 import * as lifecycle from './extension-lifecycle';
 import { OutlineBuilder } from './outline';
-import { getDefaultSettings, IServerSettings } from './server-settings';
+import { getDefaultSettings } from './server-settings';
 import { ArenaPane } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {

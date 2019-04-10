@@ -1,5 +1,6 @@
 import { LanguageClientConnection } from 'atom-languageclient';
 import {
+  DidChangeTextDocumentParams,
   DidOpenTextDocumentParams,
   PublishDiagnosticsParams,
 } from 'vscode-languageserver-protocol';
@@ -9,13 +10,33 @@ export class SuperConnection extends LanguageClientConnection {
   private _docs: Map<string, SuperDocument> = new Map();
 
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
-    const doc = new SuperDocument(params);
+    if (!this._docs.has(params.textDocument.uri)) {
+      const doc = new SuperDocument(
+        params.textDocument.text,
+        params.textDocument.uri,
+        params.textDocument.version,
+      );
+
+      doc.relatedUris.forEach(uri => {
+        this._docs.set(uri, doc);
+      });
+
+      super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
+    }
+  }
+
+  public didChangeTextDocument(params: DidChangeTextDocumentParams): void {
+    const doc = new SuperDocument(
+      params.contentChanges[0].text,
+      params.textDocument.uri,
+      params.textDocument.version ? params.textDocument.version : 0,
+    );
 
     doc.relatedUris.forEach(uri => {
       this._docs.set(uri, doc);
     });
 
-    super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
+    super.didChangeTextDocument(doc.DidChangeTextDocumentParams);
   }
 
   public onPublishDiagnostics(

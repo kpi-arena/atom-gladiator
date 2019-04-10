@@ -2,6 +2,7 @@ import { Convert } from 'atom-languageclient';
 import { readFileSync } from 'fs';
 import * as path from 'path';
 import {
+  DidChangeTextDocumentParams,
   DidOpenTextDocumentParams,
   PublishDiagnosticsParams,
   TextDocument,
@@ -24,10 +25,10 @@ export class SuperDocument {
   private _version: number;
   private _relatadUris: string[] = [];
 
-  constructor(request: DidOpenTextDocumentParams) {
-    this._uri = request.textDocument.uri;
-    this._version = request.textDocument.version;
-    this._content = this.getContent(request.textDocument.text);
+  constructor(text: string, uri: string, version: number) {
+    this._uri = uri;
+    this._version = version;
+    this._content = this.getContent(text);
   }
 
   public test() {
@@ -58,6 +59,16 @@ export class SuperDocument {
       textDocument: {
         languageId: this.LANGUAGE_ID,
         text: this._content,
+        uri: this._uri,
+        version: this._version,
+      },
+    };
+  }
+
+  public get DidChangeTextDocumentParams(): DidChangeTextDocumentParams {
+    return {
+      contentChanges: [{ text: this._content }],
+      textDocument: {
         uri: this._uri,
         version: this._version,
       },
