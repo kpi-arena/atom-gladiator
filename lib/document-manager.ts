@@ -2,7 +2,6 @@ import { Convert } from 'atom-languageclient';
 import { readFileSync } from 'fs';
 import * as path from 'path';
 import {
-  Diagnostic,
   DidOpenTextDocumentParams,
   PublishDiagnosticsParams,
   TextDocument,
@@ -23,6 +22,7 @@ export class SuperDocument {
   private _content: string;
   private _uri: string;
   private _version: number;
+  private _relatadUris: string[] = [];
 
   constructor(request: DidOpenTextDocumentParams) {
     this._uri = request.textDocument.uri;
@@ -64,42 +64,67 @@ export class SuperDocument {
     };
   }
 
+  public get relatedUris(): string[] {
+    return this._relatadUris;
+  }
+
+  /**
+   * Divides `params` into Map, in which the key is equal to the URI of the
+   * original document and the value is a PublishDiagnosticsParams with tran-
+   * slated document positions.
+   *
+   * @param params - all diagnostics for a super document.
+   */
   public filterDiagnostics(
     params: PublishDiagnosticsParams,
-  ): PublishDiagnosticsParams {
-    const filteredDiagnostics: Diagnostic[] = [];
+  ): Map<string, PublishDiagnosticsParams> {
+    const result: Map<string, PublishDiagnosticsParams> = new Map();
 
     params.diagnostics.forEach(diagnose => {
-      if (
-        this._linesRelation[diagnose.range.start.line].originUri === params.uri
-      ) {
-        filteredDiagnostics.push({
-          code: diagnose.code,
-          message: diagnose.message,
-          range: {
-            start: {
-              line: this._linesRelation[diagnose.range.start.line].originLine,
-              character: diagnose.range.start.character,
-            },
-            end: {
-              line: this._linesRelation[diagnose.range.end.line].originLine,
-              character: diagnose.range.end.character,
-            },
-          },
-          relatedInformation: diagnose.relatedInformation,
-          severity: diagnose.severity,
-          source: diagnose.source,
+      const startRelation = this._linesRelation[diagnose.range.start.line];
+
+      /* If the URI is not present in the result Map, PublishDiagnosticsParams
+      with empty diagnostics. */
+      if (!result.has(startRelation.originUri)) {
+        result.set(startRelation.originUri, {
+          uri: startRelation.originUri,
+          version: params.version,
+          diagnostics: [],
         });
       }
+
+      /* Push diagnostic of a document to diagnostics[] of the corresponding
+      document, which is determined by URI. Also the range of the diagnostic
+      translated to correspond with the original document's positions. */
+      (result.get(
+        startRelation.originUri,
+      ) as PublishDiagnosticsParams).diagnostics.push({
+        code: diagnose.code,
+        message: diagnose.message,
+        range: {
+          start: {
+            line: startRelation.originLine,
+            character: diagnose.range.start.character,
+          },
+          end: {
+            line: this._linesRelation[diagnose.range.end.line].originLine,
+            character: diagnose.range.end.character,
+          },
+        },
+        relatedInformation: diagnose.relatedInformation,
+        severity: diagnose.severity,
+        source: diagnose.source,
+      });
     });
-    return {
-      diagnostics: filteredDiagnostics,
-      uri: params.uri,
-      version: params.version,
-    };
+
+    return result;
   }
 
   private getContent(text: string): string {
+    this._relatadUris = [];
+
+    this._linesRelation = [];
+
     const editorDocs = this.getOpenYAMLDocuments();
 
     const rootPath = this.getRootPath(text, this._uri);
@@ -126,6 +151,8 @@ export class SuperDocument {
     intendation: string,
     editorDocs: Map<string, TextDocument>,
   ): string {
+    this._relatadUris.push(Convert.pathToUri(docPath));
+
     const docintendationLength = intendation.length;
     let doc = editorDocs.get(docPath);
 

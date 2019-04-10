@@ -1,32 +1,38 @@
 import { LanguageClientConnection } from 'atom-languageclient';
+import {
+  DidOpenTextDocumentParams,
+  PublishDiagnosticsParams,
+} from 'vscode-languageserver-protocol';
 import { SuperDocument } from './document-manager';
 
 export class SuperConnection extends LanguageClientConnection {
   private _docs: Map<string, SuperDocument> = new Map();
 
-  // public didOpenTextDocument(params: lsp.DidOpenTextDocumentParams): void {
-  //   const doc = new SuperDocument(params);
-  //   doc.test();
-  //   super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
+  public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
+    const doc = new SuperDocument(params);
 
-  //   this._docs.set(doc.DidOpenTextDocumentParams.textDocument.uri, doc);
-  // }
+    doc.relatedUris.forEach(uri => {
+      this._docs.set(uri, doc);
+    });
 
-  // public onPublishDiagnostics(
-  //   callback: (params: lsp.PublishDiagnosticsParams) => void,
-  // ): void {
-  //   const newCallback = (params: lsp.PublishDiagnosticsParams) => {
-  //     console.log(params);
-  //     const doc = this._docs.get(params.uri);
-  //     let filteredParams = params;
+    super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
+  }
 
-  //     if (doc) {
-  //       filteredParams = doc.filterDiagnostics(params);
-  //     }
-  //     console.log(filteredParams);
-  //     callback(filteredParams);
-  //   };
+  public onPublishDiagnostics(
+    callback: (params: PublishDiagnosticsParams) => void,
+  ): void {
+    const newCallback = (params: PublishDiagnosticsParams) => {
+      const doc = this._docs.get(params.uri);
 
-  //   super.onPublishDiagnostics(newCallback);
-  // }
+      if (doc) {
+        doc.filterDiagnostics(params).forEach(filteredParams => {
+          callback(filteredParams);
+        });
+      } else {
+        callback(params);
+      }
+    };
+
+    super.onPublishDiagnostics(newCallback);
+  }
 }
