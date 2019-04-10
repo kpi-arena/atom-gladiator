@@ -1,162 +1,110 @@
 import { Convert } from 'atom-languageclient';
-import fs, { readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import * as path from 'path';
 import {
+  Diagnostic,
   DidOpenTextDocumentParams,
   PublishDiagnosticsParams,
   TextDocument,
 } from 'vscode-languageserver-protocol';
 
+interface ILinesRelation {
+  originLine: number;
+  originUri: string;
+  intendationLength: number;
+}
+
 export class SuperDocument {
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
-  private readonly _languageID = 'yaml';
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
-  private _newText: string = '';
-  private _docs: Map<string, TextDocument> = new Map();
+  private readonly LANGUAGE_ID = 'yaml';
+
   private _linesRelation: ILinesRelation[] = [];
-  private _rootDirectory: string = '';
-  // private _request: DidOpenTextDocumentParams;
+  private _content: string;
+  private _uri: string;
+  private _version: number;
 
   constructor(request: DidOpenTextDocumentParams) {
-    // this._request = this.createRequest(request);
+    this._uri = request.textDocument.uri;
+    this._version = request.textDocument.version;
+    this._content = this.getContent(request.textDocument.text);
   }
 
-  public buildRequest(request: DidOpenTextDocumentParams) {
-    const editorDocs = this.getOpenYAMLDocuments();
-
-    const rootPath = this.getRootPath(
-      request.textDocument.text,
-      request.textDocument.uri,
+  public test() {
+    const doc = TextDocument.create(
+      this._uri,
+      this.LANGUAGE_ID,
+      this._version,
+      this._content,
     );
 
-    console.log(rootPath);
-
-    const content = this.buildDoc('', rootPath, '', editorDocs);
-
-    const doc = TextDocument.create('', this._languageID, 0, content);
     // @ts-ignore
-    const docOffsets: number[] = doc.getLineOffsets();
+    const lineOffsets: number[] = doc.getLineOffsets();
 
-    for (let index = 0; index < docOffsets.length; index++) {
-      const originalLine = doc.getText({
-        start: doc.positionAt(docOffsets[index]),
-        end: doc.positionAt(docOffsets[index + 1]),
-      });
-      console.log(`${docOffsets[index]}  - ${index} - ${originalLine}`);
+    for (let index = 0; index < lineOffsets.length - 1; index++) {
+      console.log(
+        `${index}: ${lineOffsets[index]} - ${
+          this._linesRelation[index].originLine
+        }|${this._linesRelation[index].originUri}`,
+      );
     }
+
+    console.log(Convert.pathToUri(this._linesRelation[8].originUri));
+    console.log(this._uri);
   }
 
-  // public get request(): DidOpenTextDocumentParams {
-  //   return this._request;
-  // }
-
-  public filterAnswer(
-    params: PublishDiagnosticsParams,
-  ): PublishDiagnosticsParams {
-    const doc = this._docs.get(Convert.uriToPath(params.uri));
-
-    if (!doc) {
-      return params;
-    }
-
-    const newParams: PublishDiagnosticsParams = {
-      uri: params.uri,
-      version: params.version,
-      diagnostics: [],
-    };
-
-    params.diagnostics.forEach(value => {
-      if (
-        this._linesRelation[value.range.start.line].originPath ===
-        Convert.uriToPath(doc.uri)
-      ) {
-        const newValue = value;
-
-        newValue.range.start.line = this._linesRelation[
-          value.range.start.line
-        ].originLine;
-
-        newValue.range.end.line = this._linesRelation[
-          value.range.end.line
-        ].originLine;
-
-        newParams.diagnostics.push(newValue);
-      }
-    });
-
-    return newParams;
-  }
-
-  private createRequest(
-    request: DidOpenTextDocumentParams,
-  ): DidOpenTextDocumentParams {
-    this._docs = this.getDocuments(request);
-
-    const rootPath = this.getRootPath(
-      request.textDocument.text,
-      request.textDocument.uri,
-    );
-
-    const rootDoc = this._docs.get(rootPath);
-
-    if (!rootDoc) {
-      return request;
-    }
-
-    this._rootDirectory = path.dirname(rootPath);
-
-    this.recursiveTextInsert(
-      rootDoc,
-      this.getRootPath(request.textDocument.text, request.textDocument.uri),
-    );
-
-    console.log(this._newText);
-
+  public get DidOpenTextDocumentParams(): DidOpenTextDocumentParams {
     return {
       textDocument: {
-        languageId: 'yaml',
-        version: rootDoc.version,
-        text: this._newText,
-        uri: request.textDocument.uri,
+        languageId: this.LANGUAGE_ID,
+        text: this._content,
+        uri: this._uri,
+        version: this._version,
       },
     };
   }
 
-  private recursiveTextInsert(doc: TextDocument, docPath: string) {
-    // @ts-ignore
-    const docOffsets: number[] = doc.getLineOffsets();
+  public filterDiagnostics(
+    params: PublishDiagnosticsParams,
+  ): PublishDiagnosticsParams {
+    const filteredDiagnostics: Diagnostic[] = [];
 
-    for (let index = 0; index < docOffsets.length - 1; index++) {
-      const originalLine = doc.getText({
-        start: doc.positionAt(docOffsets[index]),
-        end: doc.positionAt(docOffsets[index + 1]),
-      });
-
-      if (originalLine.match(/#root:\s*([^\n\r\s]*(\.yaml|\.yml))/i)) {
-        continue;
-      }
-
-      const lineMatch = originalLine.match(
-        /^(\t|\cI|\x20)*#include:(\t|\cI|\x20)*([^\n\r\t\cI\x20]*(\.yaml|\.yml))(\t|\cI|\x20)*$/im,
-      );
-
-      if (lineMatch) {
-        const subDoc = this._docs.get(
-          path.join(this._rootDirectory, lineMatch[3]),
-        );
-
-        if (subDoc) {
-          this.recursiveTextInsert(subDoc, lineMatch[3]);
-        }
-      } else {
-        this._newText = this._newText.concat(originalLine);
-        this._linesRelation.push({
-          originLine: docOffsets[index],
-          originPath: path.join(this._rootDirectory, docPath),
-          intendationLength: 0,
+    params.diagnostics.forEach(diagnose => {
+      if (
+        this._linesRelation[diagnose.range.start.line].originUri === params.uri
+      ) {
+        filteredDiagnostics.push({
+          code: diagnose.code,
+          message: diagnose.message,
+          range: {
+            start: {
+              line: this._linesRelation[diagnose.range.start.line].originLine,
+              character: diagnose.range.start.character,
+            },
+            end: {
+              line: this._linesRelation[diagnose.range.end.line].originLine,
+              character: diagnose.range.end.character,
+            },
+          },
+          relatedInformation: diagnose.relatedInformation,
+          severity: diagnose.severity,
+          source: diagnose.source,
         });
       }
-    }
+    });
+    return {
+      diagnostics: filteredDiagnostics,
+      uri: params.uri,
+      version: params.version,
+    };
+  }
+
+  private getContent(text: string): string {
+    const editorDocs = this.getOpenYAMLDocuments();
+
+    const rootPath = this.getRootPath(text, this._uri);
+
+    return this.buildDoc('', rootPath, '', editorDocs);
   }
 
   /**
@@ -209,7 +157,7 @@ export class SuperDocument {
 
       this._linesRelation.push({
         originLine: index,
-        originPath: docPath,
+        originUri: Convert.pathToUri(docPath),
         intendationLength: docintendationLength,
       });
 
@@ -223,7 +171,9 @@ export class SuperDocument {
         newContent = this.buildDoc(
           newContent,
           subDocPath,
-          intendation.concat(includeMatch[1] ? includeMatch[1] : ''),
+          intendation.concat(
+            includeMatch[1] ? this.getIndendation(docLine) : '',
+          ),
           editorDocs,
         );
       }
@@ -255,7 +205,7 @@ export class SuperDocument {
         editorPath,
         TextDocument.create(
           editor.getBuffer().getUri(),
-          this._languageID,
+          this.LANGUAGE_ID,
           0,
           editor.getBuffer().getText(),
         ),
@@ -277,7 +227,7 @@ export class SuperDocument {
     try {
       return TextDocument.create(
         Convert.pathToUri(docPath),
-        this._languageID,
+        this.LANGUAGE_ID,
         0,
         readFileSync(docPath).toString(),
       );
@@ -306,132 +256,20 @@ export class SuperDocument {
     return path.join(path.dirname(Convert.uriToPath(uri)), matchedComment[2]);
   }
 
-  private getDocuments(
-    request: DidOpenTextDocumentParams,
-  ): Map<string, TextDocument> {
-    const rootPath = this.getRootPath(
-      request.textDocument.text,
-      request.textDocument.uri,
-    );
+  /**
+   * Gets the indendation in front of `#` character and returns it.
+   *
+   * @param line - line contaiting `#include` comment with intendation.
+   */
+  private getIndendation(line: string): string {
+    let result = '';
+    let index = 0;
 
-    let rootDocument: TextDocument | null = null;
-
-    /* In case rootDocument is equal to the document from request. */
-    if (rootPath === Convert.uriToPath(request.textDocument.uri)) {
-      rootDocument = TextDocument.create(
-        request.textDocument.uri,
-        request.textDocument.languageId,
-        request.textDocument.version,
-        request.textDocument.text,
-      );
-    } else {
-      /* Getting root document from editor. */
-      atom.workspace.getTextEditors().forEach(editor => {
-        if (editor.getBuffer().getPath() === rootPath) {
-          rootDocument = TextDocument.create(
-            editor.getBuffer().getUri(),
-            'yaml',
-            0,
-            editor.getBuffer().getText(),
-          );
-        }
-      });
+    while (line[index] !== '#') {
+      result = result.concat(line[index]);
+      index++;
     }
 
-    /* Reading file from drive in case it was not assigned yet. */
-    if (!rootDocument) {
-      rootDocument = TextDocument.create(
-        Convert.pathToUri(rootPath),
-        'yaml',
-        0,
-        readFileSync(rootPath, { encoding: 'utf8' }),
-      );
-    }
-
-    const includesMatch = rootDocument
-      .getText()
-      .match(
-        /^(\t|\cI|\x20)*#include:([^\n\r]*(\.yaml|\.yml))(\t|\cI|\x20)*$/gim,
-      );
-
-    const subDocumentPaths: Map<string, boolean> = new Map();
-    const documents: Map<string, TextDocument> = new Map();
-
-    documents.set(rootPath, rootDocument);
-
-    if (!includesMatch) {
-      // TODO handle exception
-      return documents;
-    }
-
-    includesMatch.forEach(match => {
-      const subPath = match.match(
-        /^(\t|\cI|\x20)*#include:(\t|\cI|\x20)*([^\n\r\t\cI\x20]*(\.yaml|\.yml))(\t|\cI|\x20)*$/im,
-      );
-
-      if (!subPath) {
-        return;
-      }
-
-      subDocumentPaths.set(
-        path.join(path.dirname(rootPath), subPath[3]),
-        false,
-      );
-    });
-
-    /* Adding files from editor. */
-    atom.workspace.getTextEditors().forEach(editor => {
-      const editorPath = editor.getBuffer().getPath();
-
-      /* Skipping file if it's not a YAML file saved on drive. */
-      if (
-        !editorPath ||
-        !editorPath.match(/(\.yaml|\.yml)$/i) ||
-        !subDocumentPaths.get(editorPath)
-      ) {
-        return;
-      }
-
-      documents.set(
-        editorPath,
-        TextDocument.create(
-          editor.getBuffer().getUri(),
-          'yaml',
-          0,
-          editor.getBuffer().getText(),
-        ),
-      );
-
-      const pathEntry = subDocumentPaths.get(editorPath);
-
-      if (pathEntry !== undefined) {
-        subDocumentPaths.set(editorPath, true);
-      }
-    });
-
-    /* Adding files from drive. */
-    subDocumentPaths.forEach((isSet: boolean, subPath: string) => {
-      if (isSet) {
-        return;
-      }
-
-      documents.set(
-        subPath,
-        TextDocument.create(
-          Convert.pathToUri(subPath),
-          'yaml',
-          0,
-          readFileSync(subPath, { encoding: 'utf8' }),
-        ),
-      );
-    });
-
-    return documents;
+    return result;
   }
-}
-
-interface ILinesRelation {
-  originLine: number;
-  originPath: string;
-  intendationLength: number;
 }
