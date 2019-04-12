@@ -1,8 +1,18 @@
 import { LanguageClientConnection } from 'atom-languageclient';
+import { CancellationToken } from 'vscode-jsonrpc';
 import {
+  CompletionItem,
+  CompletionList,
+  CompletionParams,
   DidChangeTextDocumentParams,
+  DidCloseTextDocumentParams,
   DidOpenTextDocumentParams,
+  DidSaveTextDocumentParams,
+  Hover,
   PublishDiagnosticsParams,
+  TextDocumentPositionParams,
+  TextEdit,
+  WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { SuperDocument } from './document-manager';
 
@@ -39,6 +49,53 @@ export class SuperConnection extends LanguageClientConnection {
     super.didChangeTextDocument(doc.DidChangeTextDocumentParams);
   }
 
+  public willSaveTextDocument(params: WillSaveTextDocumentParams): void {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      return super.willSaveTextDocument(
+        doc.getwillSaveTextDocumentParams(params),
+      );
+    }
+
+    return super.willSaveTextDocument(params);
+  }
+
+  public willSaveWaitUntilTextDocument(
+    params: WillSaveTextDocumentParams,
+  ): Promise<TextEdit[] | null> {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      return super
+        .willSaveWaitUntilTextDocument(
+          doc.getwillSaveTextDocumentParams(params),
+        )
+        .then(value => {
+          if (!value) {
+            return value;
+          }
+
+          return doc.transformTextEditArray(value);
+        });
+    }
+
+    return super.willSaveWaitUntilTextDocument(params);
+  }
+
+  public didSaveTextDocument(params: DidSaveTextDocumentParams): void {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      super.didSaveTextDocument(doc.getDidSaveTextDocumentParams(params));
+    } else {
+      super.didSaveTextDocument(params);
+    }
+  }
+
+  // TODO: check how to does this effect the extension.
+  public didCloseTextDocument(params: DidCloseTextDocumentParams): void {}
+
   public onPublishDiagnostics(
     callback: (params: PublishDiagnosticsParams) => void,
   ): void {
@@ -55,5 +112,31 @@ export class SuperConnection extends LanguageClientConnection {
     };
 
     super.onPublishDiagnostics(newCallback);
+  }
+
+  public completion(
+    params: TextDocumentPositionParams | CompletionParams,
+    cancellationToken?: CancellationToken,
+  ): Promise<CompletionItem[] | CompletionList> {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      return super.completion(
+        doc.getCompletionParams(params),
+        cancellationToken,
+      );
+    }
+
+    return super.completion(params, cancellationToken);
+  }
+
+  public hover(params: TextDocumentPositionParams): Promise<Hover | null> {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      return super.hover(doc.getTextDocumentPositionParams(params));
+    }
+
+    return super.hover(params);
   }
 }
