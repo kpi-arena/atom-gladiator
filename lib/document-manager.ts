@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import * as path from 'path';
 import {
   CompletionParams,
+  Diagnostic,
   DidChangeTextDocumentParams,
   DidOpenTextDocumentParams,
   DidSaveTextDocumentParams,
@@ -33,21 +34,39 @@ interface ILinesRelation {
   intendationLength: number;
 }
 
+class ReferenceError extends Error {
+  constructor(
+    private _filePath: string,
+    private _range: Range,
+    private _uri: string,
+  ) {
+    super();
+  }
+
+  public get uri(): string {
+    return this._uri;
+  }
+
+  public get diagnostic(): Diagnostic {
+    return {
+      severity: 1,
+      message: `Unable to locate file: ${this._filePath}`,
+      range: this._range,
+    };
+  }
+}
+
 export class SuperDocument {
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly LANGUAGE_ID = 'yaml';
 
   private _content: string;
-  private _uri: string;
-  private _version: number;
   private _relatadUris: string[] = [];
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
   private _newRelation: ILinesRelation[] = [];
 
-  constructor(text: string, uri: string, version: number) {
-    this._uri = uri;
-    this._version = version;
+  constructor(text: string, private _uri: string, private _version: number) {
     this._content = this.getContent(text);
   }
 
@@ -113,6 +132,12 @@ export class SuperDocument {
     return this._uri;
   }
 
+  /**
+   * Transforms Range in every entry of `edits` to correspong to the actual
+   * Range in original document.
+   *
+   * @param edits - array in which Range is transformed.
+   */
   public transformTextEditArray(edits: TextEdit[]): TextEdit[] {
     edits.forEach(edit => {
       edit.range = this.transformRange(edit.range);
