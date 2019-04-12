@@ -42,7 +42,30 @@ export class SuperConnection extends LanguageClientConnection {
       params.textDocument.version ? params.textDocument.version : 0,
     );
 
-    doc.relatedUris.forEach(uri => {
+    const relatedUris = doc.relatedUris;
+
+    this._docs.forEach((value, key) => {
+      /* Not related anymore. */
+      if (relatedUris.indexOf(key) < 0 && doc.uri === value.uri) {
+        const unrelatedDoc = doc.getBasicTextDocument(key);
+
+        if (unrelatedDoc) {
+          super.didChangeTextDocument({
+            contentChanges: [
+              {
+                text: unrelatedDoc.getText(),
+              },
+            ],
+            textDocument: {
+              uri: key,
+              version: 0,
+            },
+          });
+        }
+      }
+    });
+
+    relatedUris.forEach(uri => {
       this._docs.set(uri, doc);
     });
 

@@ -13,7 +13,7 @@ import {
   TextEdit,
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
-import { Range } from 'vscode-languageserver-types';
+import { Position, Range } from 'vscode-languageserver-types';
 
 /**
  * Represents relation between an original line in document given by URI and
@@ -58,16 +58,17 @@ class ReferenceError extends Error {
 
 export class SuperDocument {
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
-  private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
+  private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
   private readonly LANGUAGE_ID = 'yaml';
 
   private _content: string;
   private _relatadUris: string[] = [];
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
   private _newRelation: ILinesRelation[] = [];
+  private _referenceError: ReferenceError | null = null;
 
   constructor(text: string, private _uri: string, private _version: number) {
-    this._content = this.getContent(text);
+    this._content = this.getContent(text, this._uri);
   }
 
   /**
@@ -187,6 +188,17 @@ export class SuperDocument {
       });
     });
 
+    /* Push reference error into diagnostics, if there are any. */
+    if (this._referenceError !== null) {
+      const correspondingDiagnostics = result.get(this._referenceError.uri);
+
+      if (correspondingDiagnostics) {
+        correspondingDiagnostics.diagnostics.push(
+          this._referenceError.diagnostic,
+        );
+      }
+    }
+
     return result;
   }
 
@@ -243,18 +255,58 @@ export class SuperDocument {
     return params;
   }
 
-  private getContent(text: string): string {
+  public getBasicTextDocument(uri: string): TextDocument | undefined {
+    const docPath = Convert.uriToPath(uri);
+
+    let doc = this.getOpenYAMLDocuments().get(docPath);
+
+    /* Checking if the document is open in the editor. In case it's not, get
+    the doc from the drive. */
+    if (!doc) {
+      doc = this.getDocumentFromDrive(docPath);
+    }
+
+    return doc;
+  }
+
+  private getContent(text: string, uri: string): string {
     this._relatadUris = [];
 
     this._newRelation = [];
 
     const editorDocs = this.getOpenYAMLDocuments();
 
-    const rootPath = this.getRootPath(text, this._uri);
+    const rootPath = this.getRootPath(text, uri);
 
     this._uri = Convert.pathToUri(rootPath);
 
-    return this.buildDoc('', rootPath, '', editorDocs);
+    try {
+      return this.buildDoc('', rootPath, '', editorDocs);
+    } catch (err) {
+      this._referenceError = err;
+
+      this._uri = uri;
+
+      this._relatadUris = [uri];
+
+      this._newRelation = [];
+
+      const doc = TextDocument.create(uri, this.LANGUAGE_ID, 0, text);
+
+      // @ts-ignore
+      const docOffsets: number[] = doc.getLineOffsets();
+
+      for (let index = 0; index < docOffsets.length; index++) {
+        this._newRelation.push({
+          intendationLength: 0,
+          newLine: index,
+          originLine: index,
+          originUri: this._uri,
+        });
+      }
+
+      return text;
+    }
   }
 
   /**
@@ -342,16 +394,33 @@ export class SuperDocument {
       const includeMatch = docLine.match(this.INCLUDE_REGEX);
 
       if (includeMatch) {
-        const subDocPath = path.join(path.dirname(docPath), includeMatch[2]);
+        const subDocPath = path.join(path.dirname(docPath), includeMatch[3]);
 
-        newContent = this.buildDoc(
-          newContent,
-          subDocPath,
-          intendation.concat(
-            includeMatch[1] ? this.getIndendation(docLine) : '',
-          ),
-          editorDocs,
-        );
+        /* If there is an error parsing the subdocument, throw an ReferenceError */
+        try {
+          newContent = this.buildDoc(
+            newContent,
+            subDocPath,
+            intendation.concat(
+              includeMatch[1] ? this.getIndendation(docLine) : '',
+            ),
+            editorDocs,
+          );
+        } catch (err) {
+          if (!(err instanceof ReferenceError)) {
+            throw new ReferenceError(
+              subDocPath,
+              Range.create(
+                Position.create(
+                  index,
+                  docLine.length - 1 - includeMatch[2].length,
+                ),
+                Position.create(index, docLine.length - 1),
+              ),
+              Convert.pathToUri(docPath),
+            );
+          }
+        }
       }
     }
 
