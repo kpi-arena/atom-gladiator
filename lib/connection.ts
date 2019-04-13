@@ -1,4 +1,4 @@
-import { LanguageClientConnection } from 'atom-languageclient';
+import { Convert, LanguageClientConnection } from 'atom-languageclient';
 import { CancellationToken } from 'vscode-jsonrpc';
 import {
   CompletionItem,
@@ -17,9 +17,16 @@ import {
 import { SuperDocument } from './document-manager';
 
 export class SuperConnection extends LanguageClientConnection {
+  /* Mapping URIs to their SuperDocuments. Key is an URI and the value is an
+  SuperDocument with all the includes resolved. */
   private _docs: Map<string, SuperDocument> = new Map();
+  /* Mapping URIs to their current version. Key: URI, value: version number. */
+  private _versions: Map<string, number> = new Map();
 
+  /* Only calls super method, if the doc wasn't opened direcly/via include ref.
+  Otherwise Atom has the diagnostics already in the memory thanks to other doc. */
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
+    /* If doc wasn't open yet, creating new SuperDocument from params. */
     if (!this._docs.has(params.textDocument.uri)) {
       const doc = new SuperDocument(
         params.textDocument.text,
@@ -27,8 +34,10 @@ export class SuperConnection extends LanguageClientConnection {
         params.textDocument.version,
       );
 
+      /* Assigning SuperDocument and initial version to all subdocuments. */
       doc.relatedUris.forEach(uri => {
         this._docs.set(uri, doc);
+        this._versions.set(uri, params.textDocument.version);
       });
 
       super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
@@ -36,18 +45,34 @@ export class SuperConnection extends LanguageClientConnection {
   }
 
   public didChangeTextDocument(params: DidChangeTextDocumentParams): void {
+    let docVersion = this._versions.get(params.textDocument.uri);
+
+    /* Increasing version number of all related docs. */
+    if (docVersion) {
+      docVersion++;
+
+      for (const key of this._versions.keys()) {
+        if (key === params.textDocument.uri) {
+          this._versions.set(key, docVersion);
+        }
+      }
+    }
+
     const doc = new SuperDocument(
       params.contentChanges[0].text,
       params.textDocument.uri,
-      params.textDocument.version ? params.textDocument.version : 0,
+      docVersion ? docVersion : 1,
     );
 
     const relatedUris = doc.relatedUris;
 
     this._docs.forEach((value, key) => {
-      /* Not related anymore. */
+      /* If doc was related before, but now it's not, it's need to send to the
+      server to get the correct diagnostics for it. */
       if (relatedUris.indexOf(key) < 0 && doc.uri === value.uri) {
-        const unrelatedDoc = doc.getBasicTextDocument(key);
+        const unrelatedDoc = SuperDocument.getBasicTextDocument(
+          Convert.uriToPath(key),
+        );
 
         if (unrelatedDoc) {
           super.didChangeTextDocument({
@@ -58,7 +83,8 @@ export class SuperConnection extends LanguageClientConnection {
             ],
             textDocument: {
               uri: key,
-              version: 0,
+              /* Version needs to be atleast = 1, otherwise server will ignore it */
+              version: docVersion ? docVersion : 1,
             },
           });
         }
@@ -116,8 +142,9 @@ export class SuperConnection extends LanguageClientConnection {
     }
   }
 
-  // TODO: check how to does this effect the extension.
-  public didCloseTextDocument(params: DidCloseTextDocumentParams): void {}
+  public didCloseTextDocument(params: DidCloseTextDocumentParams): void {
+    // TODO: check how to does this effect the extension.
+  }
 
   public onPublishDiagnostics(
     callback: (params: PublishDiagnosticsParams) => void,

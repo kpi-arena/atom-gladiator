@@ -57,9 +57,85 @@ class ReferenceError extends Error {
 }
 
 export class SuperDocument {
+  public static getBasicTextDocument(
+    docPath: string,
+    editorDocs?: Map<string, TextDocument>,
+  ): TextDocument | undefined {
+    if (!editorDocs) {
+      editorDocs = SuperDocument.getOpenYAMLDocuments();
+    }
+
+    let doc = SuperDocument.getOpenYAMLDocuments().get(docPath);
+
+    /* Checking if the document is open in the editor. In case it's not, get
+    the doc from the drive. */
+    if (!doc) {
+      doc = this.getDocumentFromDrive(docPath);
+    }
+
+    return doc;
+  }
+
+  private static readonly LANGUAGE_ID = 'yaml';
+
+  /**
+   * Creates a map from YAML documents in current workspace. Key value in the
+   * map represents path to the document. The value is a TextDocument created
+   * from document in buffer of the text editor. In case the document doesn't
+   * have a path it's ignored, since for including documents in other documents
+   * a path is required.
+   */
+  private static getOpenYAMLDocuments(): Map<string, TextDocument> {
+    const result: Map<string, TextDocument> = new Map();
+
+    atom.workspace.getTextEditors().forEach(editor => {
+      const editorPath = editor.getBuffer().getPath();
+
+      /* Skipping file if it's not a YAML file saved on drive. */
+      if (!editorPath || !editorPath.match(/(\.yaml|\.yml)$/i)) {
+        return;
+      }
+
+      /* Pushing a TextDocument created from open YAML docoment. */
+      result.set(
+        editorPath,
+        TextDocument.create(
+          editor.getBuffer().getUri(),
+          SuperDocument.LANGUAGE_ID,
+          0,
+          editor.getBuffer().getText(),
+        ),
+      );
+    });
+
+    return result;
+  }
+
+  /**
+   * Reads the file given by `docPath` and creates TextDocument from it's
+   * content. Returns the created TextDocument or undefined, if the file
+   * could not been read.
+   * @param docPath - full path to the file containing YAML document.
+   */
+  private static getDocumentFromDrive(
+    docPath: string,
+  ): TextDocument | undefined {
+    /* Creating a TextDocument from a YAML file located on the drive. If error
+    occurs while reading file, the error is caught and undefined is returned. */
+    try {
+      return TextDocument.create(
+        Convert.pathToUri(docPath),
+        SuperDocument.LANGUAGE_ID,
+        0,
+        readFileSync(docPath).toString(),
+      );
+    } catch (err) {
+      return undefined;
+    }
+  }
+
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
-  private readonly LANGUAGE_ID = 'yaml';
 
   private _content: string;
   private _relatadUris: string[] = [];
@@ -79,7 +155,7 @@ export class SuperDocument {
   public get DidOpenTextDocumentParams(): DidOpenTextDocumentParams {
     return {
       textDocument: {
-        languageId: this.LANGUAGE_ID,
+        languageId: SuperDocument.LANGUAGE_ID,
         text: this._content,
         uri: this._uri,
         version: this._version,
@@ -255,26 +331,12 @@ export class SuperDocument {
     return params;
   }
 
-  public getBasicTextDocument(uri: string): TextDocument | undefined {
-    const docPath = Convert.uriToPath(uri);
-
-    let doc = this.getOpenYAMLDocuments().get(docPath);
-
-    /* Checking if the document is open in the editor. In case it's not, get
-    the doc from the drive. */
-    if (!doc) {
-      doc = this.getDocumentFromDrive(docPath);
-    }
-
-    return doc;
-  }
-
   private getContent(text: string, uri: string): string {
     this._relatadUris = [];
 
     this._newRelation = [];
 
-    const editorDocs = this.getOpenYAMLDocuments();
+    const editorDocs = SuperDocument.getOpenYAMLDocuments();
 
     const rootPath = this.getRootPath(text, uri);
 
@@ -291,7 +353,7 @@ export class SuperDocument {
 
       this._newRelation = [];
 
-      const doc = TextDocument.create(uri, this.LANGUAGE_ID, 0, text);
+      const doc = TextDocument.create(uri, SuperDocument.LANGUAGE_ID, 0, text);
 
       // @ts-ignore
       const docOffsets: number[] = doc.getLineOffsets();
@@ -331,17 +393,12 @@ export class SuperDocument {
     this._relatadUris.push(Convert.pathToUri(docPath));
 
     const docintendationLength = intendation.length;
-    let doc = editorDocs.get(docPath);
 
-    /* Checking if the document is open in the editor. In case it's not, get
-    the doc from the drive. */
+    const doc = SuperDocument.getBasicTextDocument(docPath);
+
+    /* If the document could not be read, throw an error. */
     if (!doc) {
-      doc = this.getDocumentFromDrive(docPath);
-
-      /* If the document could not be read, throw an error. */
-      if (!doc) {
-        throw new Error();
-      }
+      throw new Error();
     }
 
     /* Using @ts-ignore to ignore the error, caused by accessing private method
@@ -425,60 +482,6 @@ export class SuperDocument {
     }
 
     return newContent;
-  }
-
-  /**
-   * Creates a map from YAML documents in current workspace. Key value in the
-   * map represents path to the document. The value is a TextDocument created
-   * from document in buffer of the text editor. In case the document doesn't
-   * have a path it's ignored, since for including documents in other documents
-   * a path is required.
-   */
-  private getOpenYAMLDocuments(): Map<string, TextDocument> {
-    const result: Map<string, TextDocument> = new Map();
-
-    atom.workspace.getTextEditors().forEach(editor => {
-      const editorPath = editor.getBuffer().getPath();
-
-      /* Skipping file if it's not a YAML file saved on drive. */
-      if (!editorPath || !editorPath.match(/(\.yaml|\.yml)$/i)) {
-        return;
-      }
-
-      /* Pushing a TextDocument created from open YAML docoment. */
-      result.set(
-        editorPath,
-        TextDocument.create(
-          editor.getBuffer().getUri(),
-          this.LANGUAGE_ID,
-          0,
-          editor.getBuffer().getText(),
-        ),
-      );
-    });
-
-    return result;
-  }
-
-  /**
-   * Reads the file given by `docPath` and creates TextDocument from it's
-   * content. Returns the created TextDocument or undefined, if the file
-   * could not been read.
-   * @param docPath - full path to the file containing YAML document.
-   */
-  private getDocumentFromDrive(docPath: string): TextDocument | undefined {
-    /* Creating a TextDocument from a YAML file located on the drive. If error
-    occurs while reading file, the error is caught and undefined is returned. */
-    try {
-      return TextDocument.create(
-        Convert.pathToUri(docPath),
-        this.LANGUAGE_ID,
-        0,
-        readFileSync(docPath).toString(),
-      );
-    } catch (err) {
-      return undefined;
-    }
   }
 
   /**
