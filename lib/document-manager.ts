@@ -1,9 +1,10 @@
 import { Convert } from 'atom-languageclient';
-import { existsSync, readFileSync } from 'fs';
+import { exists, existsSync, read, readFileSync } from 'fs';
 import * as path from 'path';
 import {
   CompletionParams,
   Diagnostic,
+  DiagnosticSeverity,
   DidChangeTextDocumentParams,
   DidOpenTextDocumentParams,
   DidSaveTextDocumentParams,
@@ -34,10 +35,27 @@ interface ILinesRelation {
   intendationLength: number;
 }
 
-declare type refErrType = 1 | 2 | 3 | 4;
+/**
+ * 0 - Missing `root` comment,
+ * 1 - Missing `include` comment,
+ * 2 - Root file couldn't be loaded,
+ * 3 - Include file couldn't be loaded.
+ */
+declare type refErrType = 0 | 1 | 2 | 3 | 4;
 
 /** Used when the file specified by `include` or `root` comment canoot be found. */
 class ReferenceError extends Error {
+  /* Item at index + 1 is an error message to 'refErrType'. */
+  private static readonly _errorMessages: Array<
+    [string, DiagnosticSeverity]
+  > = [
+    ['Missing root comment.', 3],
+    ['Missing include comment.', 3],
+    ['File not found:', 1],
+    ['File not found:', 1],
+    ['Reference causes infinite loop', 1],
+  ];
+
   /**
    * @param _filePath - path to the file in the reference comment,
    * @param _range - range of the error,
@@ -58,11 +76,16 @@ class ReferenceError extends Error {
     return this._uri;
   }
 
-  /** Returns a Diagnostic pointing to the ivnalid reference. */
+  /** Returns a Diagnostic pointing to the invalid reference. */
   public get diagnostic(): Diagnostic {
     return {
-      severity: 1,
-      message: `Unable to locate file: ${this._filePath}`,
+      severity: ReferenceError._errorMessages[this._errType][1],
+      message:
+        this._errType > 2
+          ? ReferenceError._errorMessages[this._errType][0]
+          : `${ReferenceError._errorMessages[this._errType][0]} ${
+              this._filePath
+            }`,
       range: this._range,
     };
   }
@@ -88,7 +111,27 @@ export class SuperDocument {
     return doc;
   }
 
-  private static readonly LANGUAGE_ID = 'yaml';
+  private static getFileContent(
+    filePath: string,
+    editorDocs: Map<string, TextDocument>,
+  ): string {
+    let result: string;
+    const doc = SuperDocument.getOpenYAMLDocuments().get(filePath);
+
+    /* Checking if the document is open in the editor. In case it's not, get
+    the doc from the drive. */
+    if (!doc) {
+      try {
+        result = readFileSync(filePath).toString();
+      } catch (err) {
+        result = '';
+      }
+    } else {
+      result = doc.getText();
+    }
+
+    return result;
+  }
 
   /**
    * Creates a map from YAML documents in current workspace. Key value in the
@@ -148,12 +191,13 @@ export class SuperDocument {
 
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
-
+  private static readonly LANGUAGE_ID = 'yaml';
   private _content: string;
   private _relatadUris: string[] = [];
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
   private _newRelation: ILinesRelation[] = [];
   private _referenceErrors: ReferenceError[] = [];
+  private _uriStack: string[] = [];
 
   constructor(text: string, private _uri: string, private _version: number) {
     this._content = this.getContent(text, this._uri);
@@ -343,42 +387,46 @@ export class SuperDocument {
 
   private getContent(text: string, uri: string): string {
     this._relatadUris = [];
-
     this._newRelation = [];
-
+    this._uriStack = [];
     const editorDocs = SuperDocument.getOpenYAMLDocuments();
 
     const rootPath = this.getRootPath(text, uri);
 
-    this._uri = Convert.pathToUri(rootPath);
-
-    try {
-      return this.buildDoc('', rootPath, '', editorDocs);
-    } catch (err) {
-      this._referenceErrors = [];
-
-      this._uri = uri;
-
-      this._relatadUris = [uri];
-
-      this._newRelation = [];
-
-      const doc = TextDocument.create(uri, SuperDocument.LANGUAGE_ID, 0, text);
-
-      // @ts-ignore
-      const docOffsets: number[] = doc.getLineOffsets();
-
-      for (let index = 0; index < docOffsets.length; index++) {
-        this._newRelation.push({
-          intendationLength: 0,
-          newLine: index,
-          originLine: index,
-          originUri: this._uri,
-        });
+    /* If file path and rootpath aren't equal, check if their references are correct. */
+    if (rootPath !== Convert.uriToPath(uri)) {
+      try {
+        existsSync(rootPath);
+      } catch (e) {
+        /* Root file in root comment doesn't exist. */
+        this._referenceErrors.push(
+          new ReferenceError(
+            rootPath,
+            Range.create(Position.create(0, 0), Position.create(0, 5)),
+            uri,
+            2,
+          ),
+        );
       }
 
-      return text;
+      const rootContent = SuperDocument.getFileContent(rootPath, editorDocs);
+
+      /* Root doesn't have include comment. */
+      if (!new RegExp(this.INCLUDE_REGEX, 'm').test(rootContent)) {
+        this._referenceErrors.push(
+          new ReferenceError(
+            Convert.uriToPath(uri),
+            Range.create(Position.create(0, 0), Position.create(0, 1)),
+            Convert.pathToUri(rootPath),
+            1,
+          ),
+        );
+      }
     }
+
+    this._uri = Convert.pathToUri(rootPath);
+
+    return this.buildDoc('', rootPath, '', editorDocs);
   }
 
   /**
@@ -400,16 +448,24 @@ export class SuperDocument {
     intendation: string,
     editorDocs: Map<string, TextDocument>,
   ): string {
-    this._relatadUris.push(Convert.pathToUri(docPath));
-
-    const docintendationLength = intendation.length;
-
-    const doc = SuperDocument.getBasicTextDocument(docPath);
+    const doc = SuperDocument.getBasicTextDocument(docPath, editorDocs);
 
     /* If the document could not be read, throw an error. */
     if (!doc) {
       throw new Error();
     }
+    const docUri = Convert.pathToUri(docPath);
+
+    /* Checking if the file is already in stack, in case it is throw an error. */
+    if (this._uriStack.indexOf(docUri) > -1) {
+      throw new Error('i');
+    }
+
+    this._uriStack.push(docUri);
+
+    this._relatadUris.push(docUri);
+
+    const docintendationLength = intendation.length;
 
     /* Using @ts-ignore to ignore the error, caused by accessing private method
     to obtain line offsets od the document. */
@@ -432,6 +488,23 @@ export class SuperDocument {
           start: doc.positionAt(docOffsets[index]),
           end: doc.positionAt(docOffsets[index + 1]),
         });
+
+        /* Checking if first line has root reference, if not, add an error. If
+        the line is the first line of the root document, ignore it. */
+        if (
+          index === 0 &&
+          this._uriStack.length < 2 &&
+          !docLine.match(this.ROOT_REGEX)
+        ) {
+          this._referenceErrors.push(
+            new ReferenceError(
+              Convert.uriToPath(this._uri),
+              Range.create(doc.positionAt(index), doc.positionAt(index + 1)),
+              docUri,
+              0,
+            ),
+          );
+        }
       }
 
       /* Appening the intendation of the document and the line from the docu-
@@ -442,7 +515,7 @@ export class SuperDocument {
       const newLineRelation = {
         newLine: this._newRelation.length,
         originLine: index,
-        originUri: Convert.pathToUri(docPath),
+        originUri: docUri,
         intendationLength: docintendationLength,
       };
 
@@ -475,8 +548,8 @@ export class SuperDocument {
             editorDocs,
           );
         } catch (err) {
-          if (!(err instanceof ReferenceError)) {
-            throw new ReferenceError(
+          this._referenceErrors.push(
+            new ReferenceError(
               subDocPath,
               Range.create(
                 Position.create(
@@ -485,52 +558,17 @@ export class SuperDocument {
                 ),
                 Position.create(index, docLine.length - 1),
               ),
-              Convert.pathToUri(docPath),
-              4,
-            );
-          } else {
-            throw err;
-          }
+              docUri,
+              err.message ? 4 : 3,
+            ),
+          );
         }
       }
     }
 
+    this._uriStack.pop();
+
     return newContent;
-  }
-
-  private checkReferences(
-    parentPath: string,
-    parent: string,
-    childPath: string,
-    child: string,
-  ) {
-    const childMatch = child.match(this.ROOT_REGEX);
-    const parentMatch = parent.match(this.INCLUDE_REGEX);
-
-    /* Checking if child has root comment. */
-    if (childMatch) {
-      try {
-        existsSync(path.join(path.dirname(parentPath), childMatch[2]));
-      } catch (err) {
-        this._referenceErrors.push(
-          new ReferenceError(
-            childPath,
-            Range.create(Position.create(0, 0), Position.create(0, 5)),
-            Convert.pathToUri(childPath),
-            3,
-          ),
-        );
-      }
-    } else {
-      this._referenceErrors.push(
-        new ReferenceError(
-          childPath,
-          Range.create(Position.create(0, 0), Position.create(0, 1)),
-          Convert.pathToUri(childPath),
-          1,
-        ),
-      );
-    }
   }
 
   /**
