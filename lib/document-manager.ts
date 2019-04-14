@@ -1,5 +1,5 @@
 import { Convert } from 'atom-languageclient';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import * as path from 'path';
 import {
   CompletionParams,
@@ -34,19 +34,31 @@ interface ILinesRelation {
   intendationLength: number;
 }
 
+declare type refErrType = 1 | 2 | 3 | 4;
+
+/** Used when the file specified by `include` or `root` comment canoot be found. */
 class ReferenceError extends Error {
+  /**
+   * @param _filePath - path to the file in the reference comment,
+   * @param _range - range of the error,
+   * @param _uri - URI of the document in which the error has to be shown.
+   * @param _errType - type of reference error.
+   */
   constructor(
     private _filePath: string,
     private _range: Range,
     private _uri: string,
+    private _errType: refErrType,
   ) {
     super();
   }
 
+  /** URI of the file in which the error is located. */
   public get uri(): string {
     return this._uri;
   }
 
+  /** Returns a Diagnostic pointing to the ivnalid reference. */
   public get diagnostic(): Diagnostic {
     return {
       severity: 1,
@@ -141,7 +153,7 @@ export class SuperDocument {
   private _relatadUris: string[] = [];
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
   private _newRelation: ILinesRelation[] = [];
-  private _referenceError: ReferenceError | null = null;
+  private _referenceErrors: ReferenceError[] = [];
 
   constructor(text: string, private _uri: string, private _version: number) {
     this._content = this.getContent(text, this._uri);
@@ -264,16 +276,14 @@ export class SuperDocument {
       });
     });
 
-    /* Push reference error into diagnostics, if there are any. */
-    if (this._referenceError !== null) {
-      const correspondingDiagnostics = result.get(this._referenceError.uri);
+    /* Push reference errors into diagnostics of the corresponding document. */
+    this._referenceErrors.forEach(err => {
+      const correspondingDiagnostics = result.get(err.uri);
 
       if (correspondingDiagnostics) {
-        correspondingDiagnostics.diagnostics.push(
-          this._referenceError.diagnostic,
-        );
+        correspondingDiagnostics.diagnostics.push(err.diagnostic);
       }
-    }
+    });
 
     return result;
   }
@@ -345,7 +355,7 @@ export class SuperDocument {
     try {
       return this.buildDoc('', rootPath, '', editorDocs);
     } catch (err) {
-      this._referenceError = err;
+      this._referenceErrors = [];
 
       this._uri = uri;
 
@@ -453,7 +463,8 @@ export class SuperDocument {
       if (includeMatch) {
         const subDocPath = path.join(path.dirname(docPath), includeMatch[3]);
 
-        /* If there is an error parsing the subdocument, throw an ReferenceError */
+        /* If there is an Error parsing the subdocument, throw an ReferenceError.
+        If the error is already an ReferenceError pass the error by throwing it. */
         try {
           newContent = this.buildDoc(
             newContent,
@@ -475,13 +486,51 @@ export class SuperDocument {
                 Position.create(index, docLine.length - 1),
               ),
               Convert.pathToUri(docPath),
+              4,
             );
+          } else {
+            throw err;
           }
         }
       }
     }
 
     return newContent;
+  }
+
+  private checkReferences(
+    parentPath: string,
+    parent: string,
+    childPath: string,
+    child: string,
+  ) {
+    const childMatch = child.match(this.ROOT_REGEX);
+    const parentMatch = parent.match(this.INCLUDE_REGEX);
+
+    /* Checking if child has root comment. */
+    if (childMatch) {
+      try {
+        existsSync(path.join(path.dirname(parentPath), childMatch[2]));
+      } catch (err) {
+        this._referenceErrors.push(
+          new ReferenceError(
+            childPath,
+            Range.create(Position.create(0, 0), Position.create(0, 5)),
+            Convert.pathToUri(childPath),
+            3,
+          ),
+        );
+      }
+    } else {
+      this._referenceErrors.push(
+        new ReferenceError(
+          childPath,
+          Range.create(Position.create(0, 0), Position.create(0, 1)),
+          Convert.pathToUri(childPath),
+          1,
+        ),
+      );
+    }
   }
 
   /**
