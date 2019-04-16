@@ -15,7 +15,6 @@ import {
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { Position, Range } from 'vscode-languageserver-types';
-import { SuperOutline } from './new-outline';
 
 /**
  * Represents relation between an original line in document given by URI and
@@ -202,7 +201,6 @@ export class SuperDocument {
 
   constructor(text: string, private _uri: string, private _version: number) {
     this._content = this.getContent(text, this._uri);
-    new SuperOutline(this._content, this._newRelation, this._relatadUris);
   }
 
   /**
@@ -495,7 +493,7 @@ export class SuperDocument {
         the line is the first line of the root document, ignore it. */
         if (
           index === 0 &&
-          this._uriStack.length < 2 &&
+          this._uriStack.length > 1 &&
           !docLine.match(this.ROOT_REGEX)
         ) {
           this._referenceErrors.push(
