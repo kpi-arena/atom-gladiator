@@ -189,9 +189,9 @@ export class SuperDocument {
     }
   }
 
+  public static readonly LANGUAGE_ID = 'yaml';
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
-  private static readonly LANGUAGE_ID = 'yaml';
   private _content: string;
   private _relatadUris: string[] = [];
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
@@ -263,6 +263,10 @@ export class SuperDocument {
   /** Returns URI of the root document. */
   public get uri(): string {
     return this._uri;
+  }
+
+  public get content(): string {
+    return this._content;
   }
 
   /**
@@ -383,6 +387,43 @@ export class SuperDocument {
     }
 
     return params;
+  }
+
+  /**
+   * Transforms `superRange` from the super document to range in the one of
+   * it's subdocuments. If the range ends outside of the subdocument, it's end
+   * is set to the end of the subdocument. Transform also the intendation.
+   *
+   * @param superRange - range in the super document.
+   */
+  public transformRange(superRange: Range): Range {
+    const startRelation = this._newRelation[superRange.start.line];
+
+    let endRelation = this._newRelation[superRange.start.line];
+
+    /* Going through '_newRelation' until the end of the super document is
+    reacher, or the next line is not from the subdocument or the end line is
+    found. */
+    while (
+      endRelation.newLine + 1 < this._newRelation.length &&
+      this._newRelation[endRelation.newLine + 1].originUri ===
+        startRelation.originUri &&
+      superRange.end.line !== endRelation.newLine
+    ) {
+      endRelation = this._newRelation[endRelation.newLine + 1];
+    }
+
+    /* When returning the corresponding range, indendation is substracted. */
+    return {
+      start: {
+        line: startRelation.originLine,
+        character: superRange.start.character - startRelation.intendationLength,
+      },
+      end: {
+        line: endRelation.originLine,
+        character: superRange.end.character - endRelation.intendationLength,
+      },
+    };
   }
 
   private getContent(text: string, uri: string): string {
@@ -618,42 +659,5 @@ export class SuperDocument {
     params: TextDocumentPositionParams | CompletionParams,
   ): params is CompletionParams {
     return 'context' in params;
-  }
-
-  /**
-   * Transforms `superRange` from the super document to range in the one of
-   * it's subdocuments. If the range ends outside of the subdocument, it's end
-   * is set to the end of the subdocument. Transform also the intendation.
-   *
-   * @param superRange - range in the super document.
-   */
-  private transformRange(superRange: Range): Range {
-    const startRelation = this._newRelation[superRange.start.line];
-
-    let endRelation = this._newRelation[superRange.start.line];
-
-    /* Going through '_newRelation' until the end of the super document is
-    reacher, or the next line is not from the subdocument or the end line is
-    found. */
-    while (
-      endRelation.newLine + 1 < this._newRelation.length &&
-      this._newRelation[endRelation.newLine + 1].originUri ===
-        startRelation.originUri &&
-      superRange.end.line !== endRelation.newLine
-    ) {
-      endRelation = this._newRelation[endRelation.newLine + 1];
-    }
-
-    /* When returning the corresponding range, indendation is substracted. */
-    return {
-      start: {
-        line: startRelation.originLine,
-        character: superRange.start.character - startRelation.intendationLength,
-      },
-      end: {
-        line: endRelation.originLine,
-        character: superRange.end.character - endRelation.intendationLength,
-      },
-    };
   }
 }

@@ -8,13 +8,18 @@ import {
   DidCloseTextDocumentParams,
   DidOpenTextDocumentParams,
   DidSaveTextDocumentParams,
+  DocumentSymbol,
+  DocumentSymbolParams,
   Hover,
   PublishDiagnosticsParams,
+  SymbolInformation,
+  TextDocument,
   TextDocumentPositionParams,
   TextEdit,
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { SuperDocument } from './document-manager';
+import { SingleFileOutline } from './outline';
 
 export class SuperConnection extends LanguageClientConnection {
   /* Mapping URIs to their SuperDocuments. Key is an URI and the value is an
@@ -42,6 +47,32 @@ export class SuperConnection extends LanguageClientConnection {
 
       super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
     }
+  }
+
+  public documentSymbol(
+    params: DocumentSymbolParams,
+    cancellationToken?: CancellationToken,
+  ): Promise<SymbolInformation[] | DocumentSymbol[]> {
+    const doc = this._docs.get(params.textDocument.uri);
+
+    if (doc) {
+      return new Promise((resolve, reject) => {
+        const outline = new SingleFileOutline(
+          TextDocument.create(
+            params.textDocument.uri,
+            SuperDocument.LANGUAGE_ID,
+            0,
+            doc.content,
+          ),
+        );
+
+        const res = outline.parseFile();
+        console.log(res);
+        resolve(res);
+      });
+    }
+
+    return super.documentSymbol(params, cancellationToken);
   }
 
   public didChangeTextDocument(params: DidChangeTextDocumentParams): void {

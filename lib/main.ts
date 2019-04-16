@@ -1,5 +1,5 @@
-import { CompositeDisposable, TextEditor } from 'atom';
-import * as atomIde from 'atom-ide';
+import { CompositeDisposable } from 'atom';
+// import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
   AutoLanguageClient,
@@ -101,9 +101,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
     this.sendSettings();
   }
 
-  protected getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
-    return this._outlineBuilder.getOutline(editor);
-  }
+  // protected getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
+  //   return this._outlineBuilder.getOutline(editor);
+  // }
 
   // protected getSuggestions(
   //   request: ac.SuggestionsRequestedEvent,

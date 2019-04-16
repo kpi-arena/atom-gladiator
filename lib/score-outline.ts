@@ -1,6 +1,12 @@
 import { DocumentSymbol } from 'vscode-languageserver-protocol';
+import {
+  Position,
+  Range,
+  SymbolKind,
+  TextDocument,
+} from 'vscode-languageserver-types';
 import { Kind, load, YamlMap, YAMLNode, YAMLSequence } from 'yaml-ast-parser';
-import { ILinesRelation } from './document-manager';
+import { ILinesRelation, SuperDocument } from './document-manager';
 
 /**
  * 0 - suite
@@ -13,19 +19,32 @@ declare type TestType = 0 | 1 | 2 | 3;
 export class ScoreOutline {
   /* Key: uri, value: outline. */
   private _outlines: Map<string, DocumentSymbol[]> = new Map();
-  private readonly _mainKeywordRegex = /tasks/i;
+  private readonly _symbol = [
+    SymbolKind.Array,
+    SymbolKind.Class,
+    SymbolKind.Method,
+    SymbolKind.String,
+  ];
+  private _doc: TextDocument;
 
   constructor(
-    private _content: string,
+    private _superDoc: SuperDocument,
     private _relations: ILinesRelation[],
     private _uris: string[],
   ) {
+    this._doc = TextDocument.create(
+      '',
+      SuperDocument.LANGUAGE_ID,
+      0,
+      this._superDoc.content,
+    );
     this._uris.forEach(uri => {
       this._outlines.set(uri, []);
     });
 
-    const ast = load(this._content);
-    console.log(ast);
+    const ast = load(this._superDoc.content);
+    this.createOutlines(ast);
+    console.log(this._outlines);
   }
 
   private createOutlines(node: YAMLNode): boolean {
@@ -40,64 +59,115 @@ export class ScoreOutline {
     }
 
     tasks.forEach(item => {
-      if (!this.isObject(item)) {
-        return;
-      }
-
-      const testType = this.getStringValue(this.getNodeOfKey(item, 'type'));
-
-      if (!testType) {
-        return;
-      }
-
-      switch (testType) {
-        case 'system':
-      }
-
-      const title = this.getStringValue(this.getNodeOfKey(item, 'title'));
-      const score = this.getNumberValue(this.getNodeOfKey(item, 'score'));
-      const replicas = this.getNumberValue(this.getNodeOfKey(item, 'replicas'));
+      const parent = this._outlines.get(this._superDoc.uri) as DocumentSymbol[];
+      this.recursiveParse(item, parent, this._superDoc.uri);
     });
 
     return true;
   }
 
-  private recursiveParse(node: YAMLNode, parent: DocumentSymbol) {
+  private recursiveParse(
+    node: YAMLNode,
+    destination: DocumentSymbol[],
+    parentUri: string,
+  ): number {
     if (!this.isObject(node)) {
-      return;
+      return 0;
     }
 
     const testType = this.getStringValue(this.getNodeOfKey(node, 'type'));
 
     if (!testType) {
-      return;
+      return 0;
     }
 
     switch (testType) {
+      case 'suite':
+        return this.parseTest(node, destination, parentUri, 0);
       case 'system':
+        return this.parseTest(node, destination, parentUri, 1);
+      case 'test:exec':
+        return this.parseTest(node, destination, parentUri, 2);
+      case 'test:ws':
+        return this.parseTest(node, destination, parentUri, 3);
+      default:
+        return 0;
     }
-
-    const title = this.getStringValue(this.getNodeOfKey(node, 'title'));
-    const score = this.getNumberValue(this.getNodeOfKey(node, 'score'));
-    const replicas = this.getNumberValue(this.getNodeOfKey(node, 'replicas'));
   }
 
-  private parseGenericTestType(
+  private parseTest(
     node: YAMLNode,
-    parent: DocumentSymbol,
+    destination: DocumentSymbol[],
+    parentUri: string,
     type: TestType,
-  ) {
+  ): number {
     const title = this.getStringValue(this.getNodeOfKey(node, 'title'));
     const score = this.getNumberValue(this.getNodeOfKey(node, 'score'));
     const replicas = this.getNumberValue(this.getNodeOfKey(node, 'replicas'));
 
     let scoreNumber = 0;
+    let titleValue = '';
 
-    if (typeof score === 'number' && typeof replicas === 'number') {
+    if (score !== null && replicas !== null) {
       scoreNumber = score * replicas;
-    } else if (typeof score === 'number') {
+    } else if (score !== null) {
       scoreNumber = score;
     }
+
+    if (title !== null) {
+      titleValue = title;
+    }
+
+    const range = Range.create(
+      this._doc.positionAt(node.startPosition),
+      this._doc.positionAt(node.endPosition),
+    );
+
+    const result = DocumentSymbol.create(
+      `${titleValue}(${scoreNumber})`,
+      undefined,
+      this._symbol[type],
+      range,
+      range,
+      undefined,
+    );
+
+    if (parentUri !== this._relations[range.start.line].originUri) {
+      (this._outlines.get(
+        this._relations[range.start.line].originUri,
+      ) as DocumentSymbol[]).push(result);
+
+      destination.push(
+        DocumentSymbol.create(
+          `#include (${score})`,
+          undefined,
+          SymbolKind.Event,
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          undefined,
+        ),
+      );
+    } else {
+      destination.push(result);
+    }
+
+    if (type === 0) {
+      const tasks = this.getNodeOfKey(node, 'tasks');
+
+      destination[destination.length - 1].children = [];
+
+      if (tasks !== null && this.isArray(tasks.value)) {
+        (tasks.value as YAMLSequence).items.forEach(item => {
+          scoreNumber += this.recursiveParse(
+            item,
+            destination[destination.length - 1].children as DocumentSymbol[],
+            this._relations[range.start.line].originUri,
+          );
+        });
+      }
+    }
+
+    return scoreNumber;
   }
 
   /* Getters based on types, keys, etc.: */
@@ -109,7 +179,7 @@ export class ScoreOutline {
     let result: YAMLNode | null = null;
 
     (object as YamlMap).mappings.some(mapping => {
-      if (mapping.key.value !== key) {
+      if (mapping.key.value === key) {
         result = mapping.value;
         return true;
       }
