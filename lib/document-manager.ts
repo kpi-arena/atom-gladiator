@@ -1,5 +1,5 @@
 import { Convert } from 'atom-languageclient';
-import { exists, existsSync, read, readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import * as path from 'path';
 import {
   CompletionParams,
@@ -15,12 +15,13 @@ import {
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { Position, Range } from 'vscode-languageserver-types';
+import { SuperOutline } from './new-outline';
 
 /**
  * Represents relation between an original line in document given by URI and
  * new line in the super document. Intendation
  */
-interface ILinesRelation {
+export interface ILinesRelation {
   /* Line in the super document. */
   newLine: number;
 
@@ -201,6 +202,7 @@ export class SuperDocument {
 
   constructor(text: string, private _uri: string, private _version: number) {
     this._content = this.getContent(text, this._uri);
+    new SuperOutline(this._content, this._newRelation, this._relatadUris);
   }
 
   /**
