@@ -28,6 +28,8 @@ export class SuperConnection extends LanguageClientConnection {
   /* Mapping URIs to their current version. Key: URI, value: version number. */
   private _versions: Map<string, number> = new Map();
 
+  private _singleFileDocs: Map<string, TextDocument> = new Map();
+
   /* Only calls super method, if the doc wasn't opened direcly/via include ref.
   Otherwise Atom has the diagnostics already in the memory thanks to other doc. */
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
@@ -45,34 +47,10 @@ export class SuperConnection extends LanguageClientConnection {
         this._versions.set(uri, params.textDocument.version);
       });
 
+      this._singleFileDocs = doc.subDocuments;
+
       super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
     }
-  }
-
-  public documentSymbol(
-    params: DocumentSymbolParams,
-    cancellationToken?: CancellationToken,
-  ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    const doc = this._docs.get(params.textDocument.uri);
-
-    if (doc) {
-      return new Promise((resolve, reject) => {
-        const outline = new SingleFileOutline(
-          TextDocument.create(
-            params.textDocument.uri,
-            SuperDocument.LANGUAGE_ID,
-            0,
-            doc.content,
-          ),
-        );
-
-        const res = outline.parseFile();
-        console.log(res);
-        resolve(res);
-      });
-    }
-
-    return super.documentSymbol(params, cancellationToken);
   }
 
   public didChangeTextDocument(params: DidChangeTextDocumentParams): void {
@@ -96,6 +74,7 @@ export class SuperConnection extends LanguageClientConnection {
     );
 
     const relatedUris = doc.relatedUris;
+    this._singleFileDocs = doc.subDocuments;
 
     this._docs.forEach((value, key) => {
       /* If doc was related before, but now it's not, it's need to send to the
@@ -219,5 +198,23 @@ export class SuperConnection extends LanguageClientConnection {
     }
 
     return super.hover(params);
+  }
+
+  public documentSymbol(
+    params: DocumentSymbolParams,
+    cancellationToken?: CancellationToken,
+  ): Promise<SymbolInformation[] | DocumentSymbol[]> {
+    const doc = this._singleFileDocs.get(params.textDocument.uri);
+
+    if (doc) {
+      return new Promise(resolve => {
+        const outline = new SingleFileOutline(doc);
+
+        const res = outline.parseFile();
+        resolve(res);
+      });
+    }
+
+    return super.documentSymbol(params, cancellationToken);
   }
 }

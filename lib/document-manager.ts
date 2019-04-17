@@ -193,7 +193,8 @@ export class SuperDocument {
   private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
   private _content: string;
-  private _relatadUris: string[] = [];
+  private _relatedUris: string[] = [];
+  private _subDocuments: Map<string, TextDocument> = new Map();
   private _originRelation: Map<number, ILinesRelation[]> = new Map();
   private _newRelation: ILinesRelation[] = [];
   private _referenceErrors: ReferenceError[] = [];
@@ -257,7 +258,11 @@ export class SuperDocument {
 
   /** Returns array of URIs of the root document and all it's subdocuments. */
   public get relatedUris(): string[] {
-    return this._relatadUris;
+    return this._relatedUris;
+  }
+
+  public get subDocuments(): Map<string, TextDocument> {
+    return this._subDocuments;
   }
 
   /** Returns URI of the root document. */
@@ -298,7 +303,7 @@ export class SuperDocument {
     /* Initialize Map for each related subdocument with it's relatedUri as a
     key. Skipping this steps results in Diagnostics not clearing from editor
     if each Diagnostic is fixed by user. */
-    this._relatadUris.forEach(relatedUri => {
+    this._relatedUris.forEach(relatedUri => {
       result.set(relatedUri, {
         uri: relatedUri,
         version: params.version,
@@ -427,7 +432,8 @@ export class SuperDocument {
   }
 
   private getContent(text: string, uri: string): string {
-    this._relatadUris = [];
+    this._relatedUris = [];
+    this._subDocuments = new Map();
     this._newRelation = [];
     this._uriStack = [];
     const editorDocs = SuperDocument.getOpenYAMLDocuments();
@@ -504,7 +510,8 @@ export class SuperDocument {
 
     this._uriStack.push(docUri);
 
-    this._relatadUris.push(docUri);
+    this._relatedUris.push(docUri);
+    this._subDocuments.set(docUri, doc);
 
     const docintendationLength = intendation.length;
 

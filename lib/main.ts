@@ -11,13 +11,11 @@ import path from 'path';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
 import * as lifecycle from './extension-lifecycle';
-import { OutlineBuilder } from './outline';
 import { getDefaultSettings } from './server-settings';
 import { ArenaPane } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
-  private _outlineBuilder = new OutlineBuilder();
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
 
@@ -100,28 +98,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     this.sendSettings();
   }
-
-  // protected getOutline(editor: TextEditor): Promise<atomIde.Outline | null> {
-  //   return this._outlineBuilder.getOutline(editor);
-  // }
-
-  // protected getSuggestions(
-  //   request: ac.SuggestionsRequestedEvent,
-  // ): Promise<ac.AnySuggestion[]> {
-  //   return new Promise((resolve, reject) => {
-  //     // const res: ac.AnySuggestion[] = [{ text: 'yeah' }, { text: 'boi' }];
-
-  //     if (this._connection !== null) {
-  //       this._connection.completion({
-  //         textDocument: Convert.editorToTextDocumentIdentifier(request.editor),
-  //         position: Convert.pointToPosition(request.bufferPosition),
-  //         context:
-  //       });
-  //     }
-
-  //     resolve(res);
-  //   });
-  // }
 
   private sendSettings() {
     if (this._connection !== null) {
