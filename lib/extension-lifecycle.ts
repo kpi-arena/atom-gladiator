@@ -38,14 +38,12 @@ export function deactivate() {
 }
 
 function generateProject(projectPath: string) {
-  console.log(`Path: ${projectPath}`);
   cliGenerateFiles(projectPath)
-    .then(value => {
-      console.log(projectPath);
+    .then(message => {
       atom.project.setPaths([projectPath]);
-      console.log(atom.project.getPaths());
+      atom.notifications.addSuccess(`${message}`);
     })
-    .catch(value => {
-      console.log(value);
+    .catch(message => {
+      atom.notifications.addError(`${message}`);
     });
 }

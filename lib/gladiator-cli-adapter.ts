@@ -18,7 +18,7 @@ export function cliGetSchema(): Promise<string> {
 export function cliGenerateFiles(generatePath: string) {
   return new Promise<string>((resolve, reject) => {
     const command = 'gladiator';
-    const args = ['generate', '-d', generatePath, '-s'];
+    const args = ['generate', '-d', generatePath];
     const stdout = (data: string): void => {
       console.log(data);
       resolve(data);
@@ -27,14 +27,12 @@ export function cliGenerateFiles(generatePath: string) {
       console.log(data);
       reject(data);
     };
-    const exit = (code: number): void => console.log(code);
 
     const process = new BufferedProcess({
       command,
       args,
       stdout,
       stderr,
-      exit,
     });
   });
 }
