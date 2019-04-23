@@ -55,7 +55,6 @@ export class SuperConnection extends LanguageClientConnection {
 
   public didChangeTextDocument(params: DidChangeTextDocumentParams): void {
     let docVersion = this._versions.get(params.textDocument.uri);
-
     /* Increasing version number of all related docs. */
     if (docVersion) {
       docVersion++;

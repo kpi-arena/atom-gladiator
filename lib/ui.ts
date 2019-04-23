@@ -1,4 +1,4 @@
-import { TextBuffer, TextEditor } from 'atom';
+import { Panel, TextBuffer, TextEditor } from 'atom';
 import { GladiatorConfClient } from './main';
 
 // tslint:disable-next-line: no-var-requires
@@ -115,5 +115,105 @@ export class ArenaPane {
     }
 
     return foundPane.isActive();
+  }
+}
+
+export default class CommandPalleteView {
+  private miniEditor: TextEditor;
+  private paneItem = null;
+  private panel: Panel;
+  private previouslyFocusedElement: Element | null = null;
+  private element: HTMLElement;
+  private message: HTMLElement;
+
+  constructor(text: string, private callback: (text: string) => void) {
+    this.miniEditor = new TextEditor({ mini: true });
+    this.getMiniEditorElement().addEventListener('blur', this.close.bind(this));
+    this.miniEditor.setPlaceholderText('Enter the project directory');
+    this.miniEditor.setText(text);
+
+    this.message = document.createElement('div');
+    this.message.classList.add('message');
+
+    this.element = document.createElement('div');
+    this.element.classList.add('man');
+    this.element.appendChild(this.getMiniEditorElement());
+    this.element.appendChild(this.message);
+
+    this.panel = atom.workspace.addModalPanel({
+      item: this,
+      visible: false,
+    });
+    atom.commands.add(this.getMiniEditorElement(), 'core:confirm', () => {
+      this.confirm();
+    });
+    atom.commands.add(this.getMiniEditorElement(), 'core:cancel', () => {
+      this.close();
+    });
+  }
+
+  public close() {
+    if (!this.panel.isVisible()) {
+      return;
+    }
+    this.miniEditor.setText('');
+    this.panel.hide();
+    // @ts-ignore
+    if (this.getMiniEditorElement().hasFocus()) {
+      this.restoreFocus();
+    }
+  }
+
+  public confirm() {
+    const text = this.miniEditor.getText();
+    this.close();
+    this.callback(text);
+  }
+
+  public storeFocusedElement() {
+    this.previouslyFocusedElement = document.activeElement;
+    return this.previouslyFocusedElement;
+  }
+
+  public restoreFocus() {
+    if (
+      this.previouslyFocusedElement &&
+      this.previouslyFocusedElement.parentElement
+    ) {
+      // @ts-ignore
+      return this.previouslyFocusedElement.focus();
+    }
+    atom.views.getView(atom.workspace).focus();
+  }
+
+  public open() {
+    if (this.panel.isVisible()) {
+      return;
+    }
+    this.storeFocusedElement();
+    this.panel.show();
+    this.message.textContent =
+      'Enter the path of the directory in which the files will be generated.';
+    // @ts-ignore
+    this.getMiniEditorElement().focus();
+  }
+
+  // Returns an object that can be retrieved when package is activated
+  public serialize() {}
+
+  // Tear down any state and detach
+  public destroy() {
+    // @ts-ignore
+    this.miniEditor.remove();
+  }
+
+  public setCurrentWord(text: string) {
+    this.miniEditor.setText(text);
+    this.miniEditor.selectAll();
+  }
+
+  private getMiniEditorElement(): Element {
+    // @ts-ignore
+    return this.miniEditor.element;
   }
 }

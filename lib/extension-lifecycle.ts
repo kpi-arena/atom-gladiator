@@ -1,20 +1,26 @@
 import { CompositeDisposable } from 'atom';
-import { ArenaPane } from './ui';
+import { cliText } from './gladiator-cli-adapter';
+import CommandPalleteView, { ArenaPane } from './ui';
 
 const subscriptions = new CompositeDisposable();
 
 export function activate(pane: ArenaPane) {
+  const insertView = new CommandPalleteView('', cliText);
   subscriptions.add(
     atom.commands.add('atom-workspace', {
-      'yaml-schema-interface:toggle': () => pane.toggle(),
+      'gladiator:toggle': () => pane.toggle(),
     }),
 
     atom.commands.add('atom-workspace', {
-      'yaml-schema-interface:hide': () => pane.hide(),
+      'gladiator:hide': () => pane.hide(),
     }),
 
     atom.commands.add('atom-workspace', {
-      'yaml-schema-interface:show': () => pane.show(),
+      'gladiator:show': () => pane.show(),
+    }),
+
+    atom.commands.add('atom-workspace', {
+      'gladiator:generate': () => insertView.open(),
     }),
   );
 }
