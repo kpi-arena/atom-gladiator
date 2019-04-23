@@ -2,12 +2,8 @@ import { BufferedProcess } from 'atom';
 
 export function cliGetSchema(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const command = 'python';
-    const args = [
-      'D:\\Develop\\gladiator-cli\\gladiator_cli\\cli.py',
-      'schema',
-      '-u',
-    ];
+    const command = 'gladiator';
+    const args = ['schema', '-u'];
     const stdout = (data: string): void => resolve(data);
     const stderr = (data: string): void => reject(data);
 
@@ -19,24 +15,26 @@ export function cliGetSchema(): Promise<string> {
 //       .then(value => console.log(`Win: ${value}`))
 //       .catch(value => console.log(`Lose: ${value}`));
 
-export function cliGenerateFiles() {
-  return new Promise((resolve, reject) => {
-    const generatePath = atom.project.getPaths()[0];
+export function cliGenerateFiles(generatePath: string) {
+  return new Promise<string>((resolve, reject) => {
+    const command = 'gladiator';
+    const args = ['generate', '-d', generatePath, '-s'];
+    const stdout = (data: string): void => {
+      console.log(data);
+      resolve(data);
+    };
+    const stderr = (data: string): void => {
+      console.log(data);
+      reject(data);
+    };
+    const exit = (code: number): void => console.log(code);
 
-    const command = 'python';
-    const args = [
-      'D:\\Develop\\gladiator-cli\\gladiator_cli\\cli.py',
-      'generate',
-      '-d',
-      generatePath,
-    ];
-    const stdout = (data: string): void => resolve(data);
-    const stderr = (data: string): void => reject(data);
-
-    const process = new BufferedProcess({ command, args, stdout, stderr });
+    const process = new BufferedProcess({
+      command,
+      args,
+      stdout,
+      stderr,
+      exit,
+    });
   });
-}
-
-export function cliText(text: string) {
-  console.log(`\nCli says: ${text}\n`);
 }

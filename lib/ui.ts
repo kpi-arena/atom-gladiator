@@ -122,15 +122,15 @@ export default class CommandPalleteView {
   private miniEditor: TextEditor;
   private paneItem = null;
   private panel: Panel;
+
   private previouslyFocusedElement: Element | null = null;
   private element: HTMLElement;
   private message: HTMLElement;
 
-  constructor(text: string, private callback: (text: string) => void) {
+  constructor(private callback: (text: string) => void) {
     this.miniEditor = new TextEditor({ mini: true });
     this.getMiniEditorElement().addEventListener('blur', this.close.bind(this));
     this.miniEditor.setPlaceholderText('Enter the project directory');
-    this.miniEditor.setText(text);
 
     this.message = document.createElement('div');
     this.message.classList.add('message');
@@ -186,10 +186,11 @@ export default class CommandPalleteView {
     atom.views.getView(atom.workspace).focus();
   }
 
-  public open() {
+  public open(text: string) {
     if (this.panel.isVisible()) {
       return;
     }
+    this.miniEditor.setText(text);
     this.storeFocusedElement();
     this.panel.show();
     this.message.textContent =

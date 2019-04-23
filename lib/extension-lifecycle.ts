@@ -1,11 +1,12 @@
 import { CompositeDisposable } from 'atom';
-import { cliText } from './gladiator-cli-adapter';
+import { cliGenerateFiles, cliGetSchema } from './gladiator-cli-adapter';
 import CommandPalleteView, { ArenaPane } from './ui';
+import { getProjectPath } from './util';
 
 const subscriptions = new CompositeDisposable();
+const insertView = new CommandPalleteView(generateProject);
 
 export function activate(pane: ArenaPane) {
-  const insertView = new CommandPalleteView('', cliText);
   subscriptions.add(
     atom.commands.add('atom-workspace', {
       'gladiator:toggle': () => pane.toggle(),
@@ -20,7 +21,12 @@ export function activate(pane: ArenaPane) {
     }),
 
     atom.commands.add('atom-workspace', {
-      'gladiator:generate': () => insertView.open(),
+      'gladiator:generate': () => insertView.open(getProjectPath()),
+    }),
+
+    atom.commands.add('atom-workspace', {
+      'gladiator:schema': () =>
+        cliGetSchema().then(value => console.log(value)),
     }),
   );
 }
@@ -29,4 +35,17 @@ export function deactivate() {
   if (subscriptions !== null) {
     subscriptions.dispose();
   }
+}
+
+function generateProject(projectPath: string) {
+  console.log(`Path: ${projectPath}`);
+  cliGenerateFiles(projectPath)
+    .then(value => {
+      console.log(projectPath);
+      atom.project.setPaths([projectPath]);
+      console.log(atom.project.getPaths());
+    })
+    .catch(value => {
+      console.log(value);
+    });
 }
