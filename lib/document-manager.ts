@@ -190,8 +190,8 @@ export class SuperDocument {
   }
 
   public static readonly LANGUAGE_ID = 'yaml';
-  private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root:((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
-  private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include:((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
+  private readonly ROOT_REGEX = /^(\cI|\t|\x20)*#root ((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/;
+  private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include ((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
   private _content: string;
   private _relatedUris: string[] = [];
   private _subDocuments: Map<string, TextDocument> = new Map();

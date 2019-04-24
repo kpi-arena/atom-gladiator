@@ -31,6 +31,7 @@ export function getGladiatorConfPath(): string[] {
 
 export function getConfPath(): string | null {
   let result: string | null = null;
+
   atom.project.getDirectories().forEach(dir => {
     if (result) {
       return;
