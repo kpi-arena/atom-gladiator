@@ -1,4 +1,4 @@
-import { CompositeDisposable } from 'atom';
+import { CompositeDisposable, FilesystemChange } from 'atom';
 // import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
@@ -10,21 +10,27 @@ import {
 import path from 'path';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
+import { SuperDocument } from './document-manager';
 import * as lifecycle from './extension-lifecycle';
 import { getDefaultSettings } from './server-settings';
 import { ArenaPane } from './ui';
+import { getConfPath } from './util';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
   private _schemas: Map<string, string> = new Map();
+  private _configFile: string | null = null;
+  private _apiUrl: string | null = null;
 
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
 
-    atom.config.set('core.debugLSP', true);
+    lifecycle.activate(this._pane, this);
+
+    atom.config.set('core.debugLSP', false);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -34,7 +40,17 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this._pane.show();
     }
 
-    lifecycle.activate(this._pane, this);
+    this._configFile = getConfPath();
+
+    /* Check if there is a config file in the root of the project. */
+    this._configFile = getConfPath();
+
+    if (this._configFile) {
+      /* Send notification, that config file was found. */
+      atom.notifications.addSuccess(
+        `Config file found at: ${path.dirname(this._configFile)}`,
+      );
+    }
   }
 
   public serialize(): IClientState {
@@ -48,6 +64,46 @@ export class GladiatorConfClient extends AutoLanguageClient {
     lifecycle.deactivate();
 
     return super.deactivate();
+  }
+
+  public validateConfigFile(event: FilesystemChange) {
+    /* In case the file was just created, assign its path to _configFile */
+    console.log(event.action);
+    switch (event.action) {
+      case 'created':
+        this._configFile = getConfPath();
+
+        if (this._configFile) {
+          atom.notifications.addSuccess(
+            `Config file found at: ${path.dirname(this._configFile)}`,
+          );
+        }
+        return;
+
+      case 'deleted':
+        this._configFile = null;
+        this.parseConfig();
+        return;
+
+      case 'modified':
+        this.parseConfig();
+        return;
+
+      case 'renamed':
+        this._configFile = getConfPath();
+        if (this._configFile) {
+          atom.notifications.addSuccess(
+            `Config file found at: ${path.dirname(this._configFile)}`,
+          );
+        }
+        this.parseConfig();
+        return;
+    }
+  }
+
+  public setConfigFile(configPath: string) {
+    this._configFile = configPath;
+    this.parseConfig();
   }
 
   // public preInitialization(connection: LanguageClientConnection): void {
@@ -130,6 +186,77 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (this._connection !== null) {
       this._connection.didChangeConfiguration(this._settings);
     }
+  }
+
+  private parseConfig(): void {
+    if (!this._configFile) {
+      this.deleteScehma(
+        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
+      );
+      this.deleteScehma(
+        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
+      );
+      return;
+    }
+    const doc = SuperDocument.getBasicTextDocument(this._configFile);
+
+    if (!doc) {
+      return;
+    }
+
+    this._apiUrl = this.getMatch(
+      doc.getText(),
+      /^(\cI|\t|\x20)*api-url:(\cI|\t|\x20)*((:|\.|\\|\/|\w|-)+)(\cI|\t|\x20)*/m,
+      3,
+    );
+
+    if (!this._apiUrl) {
+      return;
+    }
+
+    const problemsetPath = this.getMatch(
+      doc.getText(),
+      /^(\cI|\t|\x20)*problemset-definition:(\cI|\t|\x20)*((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/m,
+      3,
+    );
+
+    if (problemsetPath) {
+      this.addSchema(
+        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-definition`,
+        this.getName(problemsetPath),
+      );
+    }
+
+    const variantsPath = this.getMatch(
+      doc.getText(),
+      /^(\cI|\t|\x20)*problemset-variants:(\cI|\t|\x20)*((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/m,
+      3,
+    );
+
+    if (variantsPath) {
+      this.addSchema(
+        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
+        this.getName(variantsPath),
+      );
+    }
+  }
+
+  private getMatch(
+    content: string,
+    matcher: RegExp,
+    desiredGroup: number,
+  ): string | null {
+    const match = content.match(matcher);
+
+    if (!match || !match[desiredGroup]) {
+      return null;
+    }
+
+    return match[desiredGroup];
+  }
+
+  private getName(text: string): string {
+    return text.replace(/^.*[\\\/]/, '');
   }
 
   /** Starts the server by starting the process, then initializing the language server and starting adapters */

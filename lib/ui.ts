@@ -122,15 +122,13 @@ export default class CommandPalleteView {
   private miniEditor: TextEditor;
   private paneItem = null;
   private panel: Panel;
-
   private previouslyFocusedElement: Element | null = null;
   private element: HTMLElement;
   private message: HTMLElement;
 
-  constructor(private callback: (text: string) => void) {
+  constructor() {
     this.miniEditor = new TextEditor({ mini: true });
     this.getMiniEditorElement().addEventListener('blur', this.close.bind(this));
-    this.miniEditor.setPlaceholderText('Enter the project directory');
 
     this.message = document.createElement('div');
     this.message.classList.add('message');
@@ -186,15 +184,21 @@ export default class CommandPalleteView {
     atom.views.getView(atom.workspace).focus();
   }
 
-  public open(text: string) {
+  public open(
+    placeholderText: string,
+    showText: string,
+    description: string,
+    callback: (text: string) => void,
+  ) {
     if (this.panel.isVisible()) {
       return;
     }
-    this.miniEditor.setText(text);
+    this.callback = callback;
+    this.miniEditor.setText(showText);
+    this.miniEditor.setPlaceholderText(placeholderText);
     this.storeFocusedElement();
     this.panel.show();
-    this.message.textContent =
-      'Enter the path of the directory in which the files will be generated.';
+    this.message.textContent = description;
     // @ts-ignore
     this.getMiniEditorElement().focus();
   }
@@ -217,4 +221,6 @@ export default class CommandPalleteView {
     // @ts-ignore
     return this.miniEditor.element;
   }
+
+  private callback: (text: string) => void = (text: string) => {};
 }
