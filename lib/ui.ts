@@ -19,7 +19,7 @@ export class ArenaPane {
     etch.initialize(this);
 
     this.refs.loadSchemaButton.addEventListener('click', () => {
-      client.sendSchema(this.refs.findEditor.getText());
+      client.sendSchema(this.refs.findEditor.getText(), '/*');
     });
   }
 

@@ -18,12 +18,13 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
+  private _schemas: Map<string, string> = new Map();
 
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
 
-    atom.config.set('core.debugLSP', false);
+    atom.config.set('core.debugLSP', true);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -33,7 +34,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this._pane.show();
     }
 
-    lifecycle.activate(this._pane);
+    lifecycle.activate(this._pane, this);
   }
 
   public serialize(): IClientState {
@@ -87,14 +88,40 @@ export class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  public sendSchema(schema: string) {
+  public addSchema(schema: string, pattern: string) {
+    this._schemas.set(schema, pattern);
+
+    this.sendSchemas();
+  }
+
+  public deleteScehma(schema: string) {
+    this._schemas.delete(schema);
+
+    this.sendSchemas();
+  }
+
+  public sendSchema(schema: string, pattern: string) {
     if (schema.length === 0) {
       return;
     }
 
     this._settings.settings.yaml.schemas = {
-      [schema]: '/*',
+      [schema]: pattern,
     };
+
+    this.sendSettings();
+  }
+
+  private sendSchemas() {
+    if (this._schemas.size === 0) {
+      return;
+    }
+
+    this._settings.settings.yaml.schemas = {};
+
+    this._schemas.forEach((pattern, schemaUri) => {
+      this._settings.settings.yaml.schemas[schemaUri] = pattern;
+    });
 
     this.sendSettings();
   }
