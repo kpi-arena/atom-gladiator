@@ -1,18 +1,15 @@
 import { CompositeDisposable } from 'atom';
-import { Disposable } from 'vscode-jsonrpc';
+import * as path from 'path';
 import * as cli from './gladiator-cli-adapter';
-import { GladiatorConfig } from './gladiator-config';
 import { GladiatorConfClient } from './main';
 import CommandPalleteView, { ArenaPane } from './ui';
-import { getConfPath, getProjectOrHomePath } from './util';
+import { getProjectOrHomePath } from './util';
 
 const subscriptions = new CompositeDisposable();
 const insertView = new CommandPalleteView();
-let watcher: Disposable | null = null;
 
-export function activate(pane: ArenaPane, clientParam: GladiatorConfClient) {
+export function activate(pane: ArenaPane, client: GladiatorConfClient) {
   // client = clientParam;
-  const config = new GladiatorConfig(getConfPath(), clientParam);
 
   if (!cli.isInstalled()) {
     atom.notifications.addFatalError('gladiator-cli is not installed');
@@ -21,7 +18,7 @@ export function activate(pane: ArenaPane, clientParam: GladiatorConfClient) {
     cli
       .getSchemaUri()
       .then(value =>
-        clientParam.addSchema(
+        client.addSchema(
           value.replace(/\r?\n|\r/, ''),
           `/${cli.CONFIG_FILE_NAME}`,
         ),
@@ -47,7 +44,30 @@ export function activate(pane: ArenaPane, clientParam: GladiatorConfClient) {
           'Enter the project directory',
           getProjectOrHomePath(),
           'Enter the path of the directory in which the files will be generated.',
-          config.generateProject,
+          (input: string) => {
+            cli
+              .generateFilesToDir(input)
+              .then(message => {
+                // config.setPath(path.join(input, cli.CONFIG_FILE_NAME));
+                if (atom.project.getPaths().indexOf(input) < 0) {
+                  atom.open({
+                    pathsToOpen: [
+                      input,
+                      path.join(input, cli.CONFIG_FILE_NAME),
+                    ],
+                    newWindow: true,
+                  });
+                } else {
+                  atom.open({
+                    pathsToOpen: [path.join(input, cli.CONFIG_FILE_NAME)],
+                  });
+                  atom.notifications.addSuccess(`${message}`);
+                }
+              })
+              .catch(message => {
+                atom.notifications.addError(`${message}`);
+              });
+          },
         ),
     }),
 
@@ -69,14 +89,6 @@ export function activate(pane: ArenaPane, clientParam: GladiatorConfClient) {
           .catch(value => console.log(value)),
       // getGladiatorConfPath().forEach(value => console.log(value)),
     }),
-
-    (watcher = atom.project.onDidChangeFiles(events => {
-      for (const event of events) {
-        if (event.path === config.path) {
-          config.setPath(event.path);
-        }
-      }
-    })),
   );
 
   return true;
@@ -85,9 +97,5 @@ export function activate(pane: ArenaPane, clientParam: GladiatorConfClient) {
 export function deactivate() {
   if (subscriptions !== null) {
     subscriptions.dispose();
-  }
-
-  if (watcher !== null) {
-    watcher.dispose();
   }
 }

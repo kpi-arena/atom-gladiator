@@ -42,3 +42,10 @@ export function getConfPath(): string | null {
 
   return result;
 }
+
+export function getExpectedPath(): string | null {
+  if (atom.project.getPaths().length < 1) {
+    return null;
+  }
+  return path.join(atom.project.getPaths()[0], cli.CONFIG_FILE_NAME);
+}

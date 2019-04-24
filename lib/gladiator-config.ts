@@ -1,18 +1,18 @@
-import { basename, dirname, join } from 'path';
+import { dirname } from 'path';
 import { SuperDocument } from './document-manager';
 import * as cli from './gladiator-cli-adapter';
-import { CONFIG_FILE_NAME } from './gladiator-cli-adapter';
-import { GladiatorConfClient } from './main';
+import { getConfPath } from './util';
 
 export class GladiatorConfig {
   private _problemsetPath: string | null = null;
   private _variantsPath: string | null = null;
   private _apiUrl: string | null = null;
+  private _schemas: Map<string, string> = new Map();
+  private _path: string | null;
 
-  constructor(
-    private _path: string | null,
-    private _client: GladiatorConfClient,
-  ) {
+  constructor() {
+    this._path = getConfPath();
+
     this.parseConfig();
   }
 
@@ -21,7 +21,7 @@ export class GladiatorConfig {
   }
 
   public setPath(path: string): void {
-    if (basename(path) !== CONFIG_FILE_NAME) {
+    if (this.getName(path) !== cli.CONFIG_FILE_NAME) {
       this._path = null;
       atom.notifications.addSuccess(
         `Invalid Gladiator configuration file: ${path}`,
@@ -34,38 +34,20 @@ export class GladiatorConfig {
         this._path = path;
       }
     }
-
+    console.log(this._path);
     this.parseConfig();
   }
 
-  public generateProject(projectPath: string) {
-    cli
-      .generateFilesToDir(projectPath)
-      .then(message => {
-        if (atom.project.getPaths().indexOf(projectPath) < 0) {
-          atom.open({
-            pathsToOpen: [projectPath, join(projectPath, cli.CONFIG_FILE_NAME)],
-            newWindow: true,
-          });
-        } else {
-          atom.open({
-            pathsToOpen: [join(projectPath, cli.CONFIG_FILE_NAME)],
-          });
-          this.setPath(join(projectPath, cli.CONFIG_FILE_NAME));
-        }
-        atom.notifications.addSuccess(`${message}`);
-      })
-      .catch(message => {
-        atom.notifications.addError(`${message}`);
-      });
+  public getSchemas(): Map<string, string> {
+    return this._schemas;
   }
 
   private parseConfig(): void {
     if (!this._path) {
-      this._client.deleteScehma(
+      this._schemas.delete(
         `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-definition`,
       );
-      this._client.deleteScehma(
+      this._schemas.delete(
         `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
       );
       return;
@@ -95,7 +77,7 @@ export class GladiatorConfig {
     if (newProbPath && newProbPath !== this._problemsetPath) {
       this._problemsetPath = newProbPath;
 
-      this._client.addSchema(
+      this._schemas.set(
         `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-definition`,
         this.getName(this._problemsetPath),
       );
@@ -110,7 +92,7 @@ export class GladiatorConfig {
     if (newVarPath && newVarPath !== this._variantsPath) {
       this._variantsPath = newVarPath;
 
-      this._client.addSchema(
+      this._schemas.set(
         `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
         this.getName(this._variantsPath),
       );
