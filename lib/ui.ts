@@ -125,6 +125,7 @@ export default class CommandPalleteView {
   private previouslyFocusedElement: Element | null = null;
   private element: HTMLElement;
   private message: HTMLElement;
+  private content: string = '';
 
   constructor() {
     this.miniEditor = new TextEditor({ mini: true });
@@ -154,18 +155,21 @@ export default class CommandPalleteView {
     if (!this.panel.isVisible()) {
       return;
     }
-    this.miniEditor.setText('');
+
     this.panel.hide();
     // @ts-ignore
     if (this.getMiniEditorElement().hasFocus()) {
       this.restoreFocus();
     }
+
+    this.callback(this.content);
+    this.miniEditor.setText('');
+    this.content = '';
   }
 
   public confirm() {
-    const text = this.miniEditor.getText();
+    this.content = this.miniEditor.getText();
     this.close();
-    this.callback(text);
   }
 
   public storeFocusedElement() {
@@ -184,7 +188,7 @@ export default class CommandPalleteView {
     atom.views.getView(atom.workspace).focus();
   }
 
-  public open(
+  public getInput(
     placeholderText: string,
     showText: string,
     description: string,
@@ -194,6 +198,7 @@ export default class CommandPalleteView {
       return;
     }
     this.callback = callback;
+    this.content = '';
     this.miniEditor.setText(showText);
     this.miniEditor.setPlaceholderText(placeholderText);
     this.storeFocusedElement();

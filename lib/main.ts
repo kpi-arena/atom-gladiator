@@ -12,11 +12,10 @@ import { Disposable } from 'vscode-jsonrpc';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
 import { SuperDocument } from './document-manager';
-import * as lifecycle from './extension-lifecycle';
 import * as cli from './gladiator-cli-adapter';
 import { getDefaultSettings } from './server-settings';
 import CommandPalleteView, { ArenaPane } from './ui';
-import { getExpectedPath, getProjectOrHomePath } from './util';
+import { getExpectedPath } from './util';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
@@ -40,14 +39,14 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.notifications.addFatalError('gladiator-cli is not installed');
       return false;
     } else {
-      cli
-        .getSchemaUri()
-        .then(value =>
-          this.addSchema(
-            value.replace(/\r?\n|\r/, ''),
-            `/${cli.CONFIG_FILE_NAME}`,
-          ),
-        );
+      cli.getSchemaUri().then(
+        value => this.addSchema(value, cli.CONFIG_FILE_NAME),
+
+        // this.addSchema(
+        //   value.replace(/\r?\n|\r/, ''),
+        //   `/${cli.CONFIG_FILE_NAME}`,
+        // ),
+      );
     }
 
     this._subscriptions.add(
@@ -64,36 +63,16 @@ export class GladiatorConfClient extends AutoLanguageClient {
       }),
 
       atom.commands.add('atom-workspace', {
-        'gladiator:generate': () =>
-          this._insertView.open(
-            'Enter the project directory',
-            getProjectOrHomePath(),
-            'Enter the path of the directory in which the files will be generated.',
-            (input: string) => {
-              cli
-                .generateFilesToDir(input)
-                .then(message => {
-                  if (atom.project.getPaths().indexOf(input) < 0) {
-                    atom.open({
-                      pathsToOpen: [
-                        input,
-                        path.join(input, cli.CONFIG_FILE_NAME),
-                      ],
-                      newWindow: true,
-                    });
-                  } else {
-                    atom.open({
-                      pathsToOpen: [path.join(input, cli.CONFIG_FILE_NAME)],
-                    });
-                    atom.notifications.addSuccess(`${message}`);
-                  }
-                })
-                .catch(message => {
-                  atom.notifications.addError(`${message}`);
-                });
-            },
-          ),
+        'gladiator:generate-files': () =>
+          cli.generateFilesToDir(this._insertView),
       }),
+
+      // atom.commands.add('atom-workspace', {
+      //   'gladiator:test-script-path': () => {
+      //     const script = cli.getScriptPath();
+      //     console.log(script);
+      //   },
+      // }),
 
       // atom.commands.add('atom-workspace', {
       //   'gladiator:set-config-path': () =>
@@ -104,9 +83,29 @@ export class GladiatorConfClient extends AutoLanguageClient {
       //       config.setPath,
       //     ),
       // }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:pack-problemset': () => {
+          if (!this._fileExists) {
+            atom.notifications.addError('Missing .gladiator.yml file');
+          } else {
+            cli.problemsetPack(this._insertView);
+          }
+        },
+      }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:push-problemset': () => {
+          if (!this._fileExists) {
+            atom.notifications.addError('Missing .gladiator.yml file');
+          } else {
+            cli.problemsetPush(this._insertView);
+          }
+        },
+      }),
     );
 
-    atom.config.set('core.debugLSP', false);
+    atom.config.set('core.debugLSP', true);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -142,8 +141,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   public deactivate(): Promise<any> {
-    lifecycle.deactivate();
-
     if (this._configWatcher) {
       this._configWatcher.dispose();
     }
@@ -190,6 +187,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   public addSchema(schema: string, pattern: string) {
+    console.log(schema);
     this._schemas.set(schema, pattern);
 
     this.sendSchemas();
@@ -314,6 +312,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
   // PLZ
 
   private parseConfig(): void {
+    let sendSchema = false;
+
     if (!this._configPath) {
       this.deleteTempSchemas();
       return;
@@ -337,6 +337,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (this._apiUrl !== newApiUrl) {
       this.deleteTempSchemas();
 
+      sendSchema = true;
+
       this._apiUrl = newApiUrl;
     }
 
@@ -350,7 +352,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       3,
     );
 
-    if (newProbPath && newProbPath !== this._problemsetPath) {
+    if (newProbPath) {
       this._problemsetPath = newProbPath;
 
       this._schemas.set(
@@ -365,13 +367,17 @@ export class GladiatorConfClient extends AutoLanguageClient {
       3,
     );
 
-    if (newVarPath && newVarPath !== this._variantsPath) {
+    if (newVarPath) {
       this._variantsPath = newVarPath;
 
       this._schemas.set(
         `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
         this.getName(this._variantsPath),
       );
+    }
+
+    if (sendSchema) {
+      this.sendSchemas();
     }
   }
 
