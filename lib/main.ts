@@ -68,13 +68,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
       }),
 
       // atom.commands.add('atom-workspace', {
-      //   'gladiator:test-script-path': () => {
-      //     const script = cli.getScriptPath();
-      //     console.log(script);
-      //   },
-      // }),
-
-      // atom.commands.add('atom-workspace', {
       //   'gladiator:set-config-path': () =>
       //     insertView.open(
       //       'Enter the config file path',
@@ -187,7 +180,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   public addSchema(schema: string, pattern: string) {
-    console.log(schema);
     this._schemas.set(schema, pattern);
 
     this.sendSchemas();
@@ -230,85 +222,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this._connection.didChangeConfiguration(this._settings);
     }
   }
-
-  /** Starts the server by starting the process, then initializing the language server and starting adapters */
-  private startServer = async (projectPath: string): Promise<ActiveServer> => {
-    const process = await this.reportBusyWhile(
-      `Starting ${this.getServerName()} for ${path.basename(projectPath)}`,
-      async () => this.startServerProcess(projectPath),
-    );
-    // @ts-ignore
-    super.captureServerErrors(process, projectPath);
-    const connection = new SuperConnection(
-      // @ts-ignore
-      super.createRpcConnection(process),
-      this.logger,
-    );
-    this.preInitialization(connection);
-    const initializeParams = this.getInitializeParams(projectPath, process);
-    const initialization = connection.initialize(initializeParams);
-    this.reportBusyWhile(
-      `${this.getServerName()} initializing for ${path.basename(projectPath)}`,
-      () => initialization,
-    );
-    const initializeResponse = await initialization;
-    const newServer = {
-      projectPath,
-      process,
-      connection,
-      capabilities: initializeResponse.capabilities,
-      disposable: new CompositeDisposable(),
-    };
-    this.postInitialization(newServer);
-    connection.initialized();
-    connection.on('close', () => {
-      // @ts-ignore
-      if (!super._isDeactivating) {
-        // @ts-ignore
-        super._serverManager.stopServer(newServer);
-        // @ts-ignore
-        if (!super._serverManager.hasServerReachedRestartLimit(newServer)) {
-          this.logger.debug(
-            `Restarting language server for project '${newServer.projectPath}'`,
-          );
-          // @ts-ignore
-          super._serverManager.startServer(projectPath);
-        } else {
-          this.logger.warn(
-            `Language server has exceeded auto-restart limit for project '${
-              newServer.projectPath
-            }'`,
-          );
-          atom.notifications.addError(
-            `The ${
-              this.name
-            } language server has exited and exceeded the restart limit for project '${
-              newServer.projectPath
-            }'`,
-          );
-        }
-      }
-    });
-
-    const configurationKey = this.getRootConfigurationKey();
-    if (configurationKey) {
-      newServer.disposable.add(
-        atom.config.observe(configurationKey, config => {
-          const mappedConfig = this.mapConfigurationObject(config || {});
-          if (mappedConfig) {
-            connection.didChangeConfiguration({
-              settings: mappedConfig,
-            });
-          }
-        }),
-      );
-    }
-
-    // @ts-ignore
-    super.startExclusiveAdapters(newServer);
-    return newServer;
-  };
-
   // PLZ
 
   private parseConfig(): void {
@@ -407,6 +320,88 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private getName(text: string): string {
     return text.replace(/^.*[\\\/]/, '');
   }
+
+  /**
+   * Same as `super.startServer()`, but the method is private and doesn't allow
+   * any changes to be made. This method is implemented  to set the connection
+   * to `SuperConnection`.
+   */
+  private startServer = async (projectPath: string): Promise<ActiveServer> => {
+    const process = await this.reportBusyWhile(
+      `Starting ${this.getServerName()} for ${path.basename(projectPath)}`,
+      async () => this.startServerProcess(projectPath),
+    );
+    // @ts-ignore
+    super.captureServerErrors(process, projectPath);
+    const connection = new SuperConnection(
+      // @ts-ignore
+      super.createRpcConnection(process),
+      this.logger,
+    );
+    this.preInitialization(connection);
+    const initializeParams = this.getInitializeParams(projectPath, process);
+    const initialization = connection.initialize(initializeParams);
+    this.reportBusyWhile(
+      `${this.getServerName()} initializing for ${path.basename(projectPath)}`,
+      () => initialization,
+    );
+    const initializeResponse = await initialization;
+    const newServer = {
+      projectPath,
+      process,
+      connection,
+      capabilities: initializeResponse.capabilities,
+      disposable: new CompositeDisposable(),
+    };
+    this.postInitialization(newServer);
+    connection.initialized();
+    connection.on('close', () => {
+      // @ts-ignore
+      if (!super._isDeactivating) {
+        // @ts-ignore
+        super._serverManager.stopServer(newServer);
+        // @ts-ignore
+        if (!super._serverManager.hasServerReachedRestartLimit(newServer)) {
+          this.logger.debug(
+            `Restarting language server for project '${newServer.projectPath}'`,
+          );
+          // @ts-ignore
+          super._serverManager.startServer(projectPath);
+        } else {
+          this.logger.warn(
+            `Language server has exceeded auto-restart limit for project '${
+              newServer.projectPath
+            }'`,
+          );
+          atom.notifications.addError(
+            `The ${
+              this.name
+            } language server has exited and exceeded the restart limit for project '${
+              newServer.projectPath
+            }'`,
+          );
+        }
+      }
+    });
+
+    const configurationKey = this.getRootConfigurationKey();
+    if (configurationKey) {
+      newServer.disposable.add(
+        atom.config.observe(configurationKey, config => {
+          const mappedConfig = this.mapConfigurationObject(config || {});
+          if (mappedConfig) {
+            connection.didChangeConfiguration({
+              settings: mappedConfig,
+            });
+          }
+        }),
+      );
+    }
+
+    // @ts-ignore
+    super.startExclusiveAdapters(newServer);
+    return newServer;
+  };
 }
 
 module.exports = new GladiatorConfClient();

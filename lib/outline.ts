@@ -15,6 +15,7 @@ import {
   YAMLScalar,
   YAMLSequence,
 } from 'yaml-ast-parser';
+import { SuperDocument } from './document-manager';
 
 export class SingleFileOutline {
   constructor(private _doc: TextDocument) {}
@@ -196,7 +197,7 @@ export class SingleFileOutline {
   }
 
   private parseYamlSequence(sequence: YAMLSequence): DocumentSymbol[] {
-    let children: DocumentSymbol[] = [];
+    const children: DocumentSymbol[] = [];
 
     sequence.items.forEach((item, index) => {
       children.push(
@@ -264,5 +265,215 @@ export class SingleFileOutline {
       this._doc.positionAt(node.startPosition),
       this._doc.positionAt(node.endPosition),
     );
+  }
+}
+
+interface ITask {
+  type: number;
+  title: string | null;
+  score: number;
+  replicas: number;
+}
+
+export class ScoreOutline {
+  private _taskTypes: string[] = ['suite', 'system', 'test:exec', 'test:ws'];
+  private _taskTypeSymbol: SymbolKind[] = [
+    SymbolKind.Array,
+    SymbolKind.Object,
+    SymbolKind.Variable,
+    SymbolKind.Module,
+  ];
+
+  constructor(private _superDoc: SuperDocument) {}
+
+  public parseFile(): DocumentSymbol[] {
+    const tasks = this.getTasksArray(load(this._superDoc.content));
+
+    if (tasks) {
+      return this.parseSuite(tasks)[0];
+    }
+
+    return [];
+  }
+
+  private getTasksArray(node: YAMLNode): YAMLSequence | null {
+    let result: YAMLSequence | null = null;
+
+    if (node.kind === Kind.MAP) {
+      (node as YamlMap).mappings.forEach(mapping => {
+        if (mapping.key.value === 'tasks' && mapping.value.kind === Kind.SEQ) {
+          result = mapping.value as YAMLSequence;
+        } else if (mapping.value.kind === Kind.ANCHOR_REF) {
+          const tmpResult = this.getTasksArray(mapping.value.value);
+
+          if (tmpResult && !result) {
+            result = tmpResult;
+          }
+        }
+      });
+    }
+
+    return result;
+  }
+
+  private parseTask(node: YAMLNode): [DocumentSymbol | null, number] {
+    if (node.kind === Kind.MAP) {
+      let result: ITask = {
+        type: -1,
+        title: null,
+        score: 0,
+        replicas: 0,
+      };
+
+      result = this.parseTaskMap(node, result);
+
+      // let type: number = -1;
+      // let title: string | null = null;
+      // let score: number = 0;
+      // let replicas: number = 0;
+
+      // (node as YamlMap).mappings.forEach(mapping => {
+      //   switch (mapping.key.value) {
+      //     case 'type':
+      //       type = this.getType(mapping.value);
+      //       return;
+      //     case 'title':
+      //       title = this.getString(mapping.value);
+      //       return;
+      //     case 'score':
+      //       score = this.getNumber(mapping.value);
+      //       return;
+      //     case 'replicas':
+      //       replicas = this.getNumber(mapping.value);
+      //       return;
+      //     case '':
+      //   }
+      // });
+
+      if (result.type < 0 || !result.title) {
+        return [null, 0];
+      }
+
+      if (result.replicas > 0) {
+        result.score = result.score * result.replicas;
+      }
+
+      let children: DocumentSymbol[] = [];
+
+      const tasks = this.getTasksArray(node);
+
+      if (result.type === 0 && tasks) {
+        const suite = this.parseSuite(tasks);
+        children = suite[0];
+        result.score += suite[1];
+      }
+
+      return [
+        DocumentSymbol.create(
+          `${result.title}(${result.score})`,
+          undefined,
+          this._taskTypeSymbol[result.type],
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          children,
+        ),
+        result.score,
+      ];
+    }
+
+    return [null, 0];
+  }
+
+  private parseTaskMap(node: YAMLNode, result: ITask) {
+    // const result: ITask = {};
+
+    if (node.kind === Kind.MAP) {
+      (node as YamlMap).mappings.forEach(mapping => {
+        switch (mapping.key.value) {
+          case 'type':
+            result.type = this.getType(mapping.value);
+            return;
+          case 'title':
+            result.title = this.getString(mapping.value);
+            return;
+          case 'score':
+            result.score = this.getNumber(mapping.value);
+            return;
+          case 'replicas':
+            result.replicas = this.getNumber(mapping.value);
+            return;
+          case '<<':
+            result = this.parseTaskMap(mapping.value.value, result);
+            return;
+        }
+      });
+    }
+
+    return result;
+  }
+
+  private parseSuite(node: YAMLSequence): [DocumentSymbol[], number] {
+    const result: DocumentSymbol[] = [];
+
+    let score: number = 0;
+
+    node.items.forEach(item => {
+      const subResult = this.parseTask(item);
+
+      if (subResult[0]) {
+        result.push(subResult[0]);
+        score += subResult[1];
+      }
+    });
+
+    return [result, score];
+  }
+
+  private getType(node: YAMLNode): number {
+    const typeString = this.getString(node);
+
+    let result = -1;
+
+    if (!typeString) {
+      return result;
+    }
+
+    this._taskTypes.forEach((taskType, index) => {
+      if (taskType === typeString) {
+        result = index;
+      }
+    });
+
+    return result;
+  }
+
+  private getString(node: YAMLNode): string | null {
+    if (node.kind !== Kind.SCALAR) {
+      return null;
+    }
+
+    if (node.value === null || node.valueObject === null) {
+      return null;
+    } else if (node.valueObject && typeof node.valueObject === 'number') {
+      return null;
+    } else if (typeof node.valueObject === 'boolean') {
+      return null;
+    } else {
+      return node.value;
+    }
+  }
+
+  private getNumber(node: YAMLNode): number {
+    if (node.kind !== Kind.SCALAR) {
+      return 0;
+    }
+
+    if (node.value === null || node.valueObject === null) {
+      return 0;
+    } else if (node.valueObject && typeof node.valueObject === 'number') {
+      return node.valueObject;
+    }
+
+    return 0;
   }
 }

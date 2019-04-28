@@ -19,7 +19,7 @@ import {
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { SuperDocument } from './document-manager';
-import { SingleFileOutline } from './outline';
+import { ScoreOutline } from './outline';
 
 export class SuperConnection extends LanguageClientConnection {
   /* Mapping URIs to their SuperDocuments. Key is an URI and the value is an
@@ -203,12 +203,12 @@ export class SuperConnection extends LanguageClientConnection {
     params: DocumentSymbolParams,
     cancellationToken?: CancellationToken,
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    const doc = this._singleFileDocs.get(params.textDocument.uri);
-
+    // const doc = this._singleFileDocs.get(params.textDocument.uri);
+    const doc = this._docs.get(params.textDocument.uri);
     if (doc) {
       return new Promise(resolve => {
-        const outline = new SingleFileOutline(doc);
-
+        // const outline = new SingleFileOutline(doc);
+        const outline = new ScoreOutline(doc);
         const res = outline.parseFile();
         resolve(res);
       });
