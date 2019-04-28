@@ -7,7 +7,7 @@ import {
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
-import path from 'path';
+import * as path from 'path';
 import { Disposable } from 'vscode-jsonrpc';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
@@ -293,6 +293,17 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this.sendSchemas();
     }
   }
+
+  // private checkIfFileExists(filePath: string) {
+  //   if (!this._configPath) {
+  //     return;
+  //   }
+  //   fs.exists(path.join(path.dirname(this._configPath), filePath), (exists) => {
+  //     if (!exists) {
+  //       this.provideCodeFormat
+  //     }
+  //   });
+  // }
 
   private deleteTempSchemas() {
     this._schemas.delete(

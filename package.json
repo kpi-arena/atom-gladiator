@@ -2,7 +2,7 @@
   "name": "ide-gladiator-conf",
   "main": "./build/main.js",
   "version": "0.0.0",
-  "description": "Atom IDE implementation of gladiator-conf-language-server ",
+  "description": "Extension providing support for wirting Gladiator configuration files.",
   "keywords": [
     "yaml",
     "ide-yaml",
