@@ -9,9 +9,12 @@ import {
 } from 'atom-languageclient';
 import * as path from 'path';
 import { Disposable } from 'vscode-jsonrpc';
+import { TextDocument } from 'vscode-languageserver-protocol';
+import * as yaml from 'yaml-ast-parser';
 import { IClientState } from './client-state';
 import { SuperConnection } from './connection';
 import { SuperDocument } from './document-manager';
+import { FormatValidation } from './format-schema';
 import * as cli from './gladiator-cli-adapter';
 import { getDefaultSettings } from './server-settings';
 import CommandPalleteView, { ArenaPane } from './ui';
@@ -49,7 +52,41 @@ export class GladiatorConfClient extends AutoLanguageClient {
       );
     }
 
+    const schema = yaml.safeLoad(`
+package:
+  - $
+  - orig-file: $
+  - directory:
+      into: $
+      include:
+        - $
+      exclude:
+        - $
+problemset-definition: $
+problemset-variants: $
+    `);
+    const format = new FormatValidation(schema);
+    format.subPath = 'D:\\Develop\\test';
+
     this._subscriptions.add(
+      atom.commands.add('atom-workspace', {
+        'gladiator:test': () => {
+          const doc = atom.workspace.getActiveTextEditor();
+
+          if (doc) {
+            format.doc = TextDocument.create(
+              '',
+              '',
+              0,
+              doc.getBuffer().getText(),
+            );
+
+            console.log(
+              format.getDiagnostics(yaml.safeLoad(doc.getBuffer().getText())),
+            );
+          }
+        },
+      }),
       atom.commands.add('atom-workspace', {
         'gladiator:toggle': () => this._pane.toggle(),
       }),
