@@ -4,6 +4,7 @@ import {
   ActiveServer,
   AutoLanguageClient,
   ConnectionType,
+  Convert,
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
@@ -52,21 +53,29 @@ export class GladiatorConfClient extends AutoLanguageClient {
       );
     }
 
-    const schema = yaml.safeLoad(`
-package:
-  - $
-  - orig-file: $
-  - directory:
-      into: $
-      include:
-        - $
-      exclude:
-        - $
-problemset-definition: $
-problemset-variants: $
-    `);
-    const format = new FormatValidation(schema);
+    const format = new FormatValidation(
+      yaml.safeLoad(`
+    package:
+      - $
+      - orig-file: $
+      - directory:
+          into: $
+          include:
+            - $
+          exclude:
+            - $
+    problemset-definition: $
+    problemset-variants: $
+        `),
+    );
     format.subPath = 'D:\\Develop\\test';
+
+    if (this._connection && this._configPath) {
+      (this._connection as SuperConnection).addFormat(
+        Convert.pathToUri(this._configPath),
+        format,
+      );
+    }
 
     this._subscriptions.add(
       atom.commands.add('atom-workspace', {
@@ -84,6 +93,16 @@ problemset-variants: $
             console.log(
               format.getDiagnostics(yaml.safeLoad(doc.getBuffer().getText())),
             );
+            console.log(yaml.safeLoad(doc.getBuffer().getText()));
+            format.getCompletionItems({
+              textDocument: {
+                uri: '',
+              },
+              position: {
+                line: 15,
+                character: 16,
+              },
+            });
           }
         },
       }),

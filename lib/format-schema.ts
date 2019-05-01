@@ -2,9 +2,12 @@ import { existsSync } from 'fs';
 import isGlob from 'is-glob';
 import { join } from 'path';
 import {
+  CompletionItem,
+  CompletionParams,
   Diagnostic,
   Range,
   TextDocument,
+  TextDocumentPositionParams,
 } from 'vscode-languageserver-protocol';
 import {
   Kind,
@@ -107,10 +110,16 @@ class SchemaNode {
   }
 }
 
+interface IRouteNode {
+  kind: Kind;
+  key: string;
+}
+
 export class FormatValidation {
   private _routes: Map<string, SchemaNode> = new Map();
   private _subpath: string = '';
   private _textDoc: TextDocument = TextDocument.create('', '', 0, '');
+  private _nodeX: YAMLNode | null = null;
 
   constructor(private _schema: YAMLNode) {
     if (this._schema.kind === Kind.MAP) {
@@ -129,7 +138,21 @@ export class FormatValidation {
   }
 
   public getDiagnostics(node: YAMLNode): Diagnostic[] {
+    this._nodeX = node;
     return this.validate(node);
+  }
+
+  public getCompletionItems(
+    params: TextDocumentPositionParams | CompletionParams,
+  ): CompletionItem[] {
+    if (this._nodeX) {
+      this.isRelatedCompletion(
+        this._nodeX,
+        this._textDoc.offsetAt(params.position),
+      );
+    }
+
+    return [];
   }
 
   private validate(node: YAMLNode, schema?: SchemaNode): Diagnostic[] {
@@ -262,6 +285,81 @@ export class FormatValidation {
           1,
         ),
       ];
+    }
+  }
+
+  private isRelatedCompletion(node: YAMLNode, position: number): boolean {
+    const route: IRouteNode[] = [];
+
+    let changed: boolean = true;
+
+    while (node.kind !== Kind.SCALAR && changed) {
+      changed = false;
+
+      if (
+        node.key &&
+        (node.key as YAMLNode).startPosition < position &&
+        (node.key as YAMLNode).endPosition > position
+      ) {
+        return false;
+      }
+
+      switch (node.kind) {
+        case Kind.ANCHOR_REF:
+          node = node.value;
+          changed = true;
+          break;
+
+        case Kind.MAP:
+          (node as YamlMap).mappings.forEach(mapping => {
+            if (
+              mapping.startPosition < position &&
+              mapping.endPosition > position
+            ) {
+              node = mapping;
+              changed = true;
+            }
+          });
+          break;
+
+        case Kind.MAPPING:
+          const valueKind = this.resolveKind(node);
+
+          if (valueKind) {
+            route.push({
+              key: node.key ? node.key.value : '',
+              kind: valueKind,
+            });
+
+            node = node.value;
+
+            changed = true;
+          }
+          break;
+
+        case Kind.SEQ:
+          (node as YAMLSequence).items.forEach(item => {
+            if (item.startPosition < position && item.endPosition > position) {
+              node = item;
+              changed = true;
+            }
+          });
+          break;
+      }
+    }
+
+    const schemaRoute = this._routes.get(route[0].key);
+
+    return true;
+  }
+
+  private resolveKind(node: YAMLNode): Kind | null {
+    if (node.value && node.kind === Kind.ANCHOR_REF) {
+      return this.resolveKind(node.value);
+    } else if (node.value) {
+      return node.value.kind;
+    } else {
+      return null;
     }
   }
 }

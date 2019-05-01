@@ -18,7 +18,9 @@ import {
   TextEdit,
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
+import { safeLoad } from 'yaml-ast-parser';
 import { SuperDocument } from './document-manager';
+import { FormatValidation } from './format-schema';
 import { ScoreOutline } from './outline';
 
 export class SuperConnection extends LanguageClientConnection {
@@ -28,7 +30,13 @@ export class SuperConnection extends LanguageClientConnection {
   /* Mapping URIs to their current version. Key: URI, value: version number. */
   private _versions: Map<string, number> = new Map();
 
+  private _format: Map<string, FormatValidation> = new Map();
+
   private _singleFileDocs: Map<string, TextDocument> = new Map();
+
+  public addFormat(uri: string, format: FormatValidation) {
+    this._format.set(uri, format);
+  }
 
   /* Only calls super method, if the doc wasn't opened direcly/via include ref.
   Otherwise Atom has the diagnostics already in the memory thanks to other doc. */
@@ -159,6 +167,20 @@ export class SuperConnection extends LanguageClientConnection {
     callback: (params: PublishDiagnosticsParams) => void,
   ): void {
     const newCallback = (params: PublishDiagnosticsParams) => {
+      if (
+        this._format.has(params.uri) &&
+        this._singleFileDocs.has(params.uri)
+      ) {
+        const singleDoc = this._singleFileDocs.get(params.uri) as TextDocument;
+        const format = this._format.get(params.uri) as FormatValidation;
+
+        format.doc = singleDoc;
+
+        params.diagnostics = params.diagnostics.concat(
+          format.getDiagnostics(safeLoad(singleDoc.getText())),
+        );
+      }
+
       const doc = this._docs.get(params.uri);
 
       if (doc) {
