@@ -4,30 +4,28 @@ import {
   ActiveServer,
   AutoLanguageClient,
   ConnectionType,
-  Convert,
   LanguageClientConnection,
   LanguageServerProcess,
 } from 'atom-languageclient';
 import * as path from 'path';
-import { Disposable } from 'vscode-jsonrpc';
 import { TextDocument } from 'vscode-languageserver-protocol';
 import * as yaml from 'yaml-ast-parser';
 import { IClientState } from './client-state';
+import { ConfigWatcher } from './config-watcher';
 import { SuperConnection } from './connection';
-import { SuperDocument } from './document-manager';
 import { FormatValidation } from './format-schema';
 import * as cli from './gladiator-cli-adapter';
 import { getDefaultSettings } from './server-settings';
 import CommandPalleteView, { ArenaPane } from './ui';
-import { getExpectedPath } from './util';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
   private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
+  private _config: ConfigWatcher | null = null;
   private _schemas: Map<string, string> = new Map();
-  private _configPath: string | null = getExpectedPath();
-  private _configWatcher: Disposable | null = null;
+  // private _configPath: string | null = getExpectedPath();
+  // private _configWatcher: Disposable | null = null;
   private _fileExists: boolean = false;
   private _apiUrl: string | null = null;
   private _variantsPath: string | null = null;
@@ -38,6 +36,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
+
+    this._config = new ConfigWatcher(atom.project.getPaths()[0], this);
 
     if (!cli.isInstalled()) {
       atom.notifications.addFatalError('gladiator-cli is not installed');
@@ -69,13 +69,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
         `),
     );
     format.subPath = 'D:\\Develop\\test';
-
-    if (this._connection && this._configPath) {
-      (this._connection as SuperConnection).addFormat(
-        Convert.pathToUri(this._configPath),
-        format,
-      );
-    }
 
     this._subscriptions.add(
       atom.commands.add('atom-workspace', {
@@ -163,23 +156,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (state.isPaneActive) {
       this._pane.show();
     }
-
-    this.parseConfig();
-
-    this._configWatcher = atom.project.onDidChangeFiles(events => {
-      for (const event of events) {
-        if (this._configPath && this._configPath === event.path) {
-          switch (event.action) {
-            case 'created':
-            case 'modified':
-            case 'renamed':
-              this.parseConfig();
-              return;
-            case 'deleted':
-          }
-        }
-      }
-    });
   }
 
   public serialize(): IClientState {
@@ -190,10 +166,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   public deactivate(): Promise<any> {
-    if (this._configWatcher) {
-      this._configWatcher.dispose();
-    }
-
     return super.deactivate();
   }
 
@@ -224,6 +196,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
   public getConnectionType(): ConnectionType {
     return 'stdio';
   }
+  public lol() {
+    console.log('\n\nloool\n\n');
+  }
 
   public startServerProcess(projectPath: string): LanguageServerProcess {
     return super.spawnChildNode([
@@ -235,7 +210,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  public addSchema(schema: string, pattern: string) {
+  public addSchema(schema: string, pattern: string): void {
     this._schemas.set(schema, pattern);
 
     this.sendSchemas();
@@ -259,6 +234,14 @@ export class GladiatorConfClient extends AutoLanguageClient {
     this.sendSettings();
   }
 
+  public deleteTempSchemas() {
+    this._schemas = new Map();
+    cli.getSchemaUri().then(value => {
+      this.addSchema(value, cli.CONFIG_FILE_NAME);
+      this.sendSchemas();
+    });
+  }
+
   private sendSchemas() {
     if (this._schemas.size === 0) {
       return;
@@ -278,77 +261,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this._connection.didChangeConfiguration(this._settings);
     }
   }
-  // PLZ
-
-  private parseConfig(): void {
-    let sendSchema = false;
-
-    if (!this._configPath) {
-      this.deleteTempSchemas();
-      return;
-    }
-    const doc = SuperDocument.getBasicTextDocument(this._configPath);
-
-    if (!doc) {
-      this.deleteTempSchemas();
-      this._fileExists = false;
-      return;
-    }
-
-    this._fileExists = true;
-
-    const newApiUrl = this.getMatch(
-      doc.getText(),
-      /^(\cI|\t|\x20)*api-url:(\cI|\t|\x20)*((:|\.|\\|\/|\w|-)+)(\cI|\t|\x20)*/m,
-      3,
-    );
-
-    if (this._apiUrl !== newApiUrl) {
-      this.deleteTempSchemas();
-
-      sendSchema = true;
-
-      this._apiUrl = newApiUrl;
-    }
-
-    if (!this._apiUrl) {
-      this.deleteTempSchemas();
-    }
-
-    const newProbPath = this.getMatch(
-      doc.getText(),
-      /^(\cI|\t|\x20)*problemset-definition:(\cI|\t|\x20)*((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/m,
-      3,
-    );
-
-    if (newProbPath) {
-      this._problemsetPath = newProbPath;
-
-      this._schemas.set(
-        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-definition`,
-        this.getName(this._problemsetPath),
-      );
-    }
-
-    const newVarPath = this.getMatch(
-      doc.getText(),
-      /^(\cI|\t|\x20)*problemset-variants:(\cI|\t|\x20)*((\.|\\|\/|\w|-)+(\.yaml|\.yml))(\cI|\t|\x20)*/m,
-      3,
-    );
-
-    if (newVarPath) {
-      this._variantsPath = newVarPath;
-
-      this._schemas.set(
-        `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
-        this.getName(this._variantsPath),
-      );
-    }
-
-    if (sendSchema) {
-      this.sendSchemas();
-    }
-  }
 
   // private checkIfFileExists(filePath: string) {
   //   if (!this._configPath) {
@@ -360,15 +272,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   //     }
   //   });
   // }
-
-  private deleteTempSchemas() {
-    this._schemas.delete(
-      `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-definition`,
-    );
-    this._schemas.delete(
-      `${this._apiUrl}/gladiator/api/v2/utils/schema/problemset-variants`,
-    );
-  }
 
   private getMatch(
     content: string,
