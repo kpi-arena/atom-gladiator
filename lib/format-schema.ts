@@ -107,15 +107,14 @@ class SchemaNode {
 }
 
 export class FormatValidation {
-  private _routes: Map<string, YAMLNode> = new Map();
+  private _routes: Map<string, SchemaNode> = new Map();
   private _subpath: string = '';
   private _textDoc: TextDocument = TextDocument.create('', '', 0, '');
 
   constructor(private _schema: YAMLNode) {
-    console.log(new SchemaNode(this._schema));
     if (this._schema.kind === Kind.MAP) {
       (this._schema as YamlMap).mappings.forEach(mapping => {
-        this._routes.set(mapping.key.value, mapping.value);
+        this._routes.set(mapping.key.value, new SchemaNode(mapping.value));
       });
     }
   }
@@ -132,7 +131,7 @@ export class FormatValidation {
     return this.validate(node);
   }
 
-  private validate(node: YAMLNode, schema?: YAMLNode): Diagnostic[] {
+  private validate(node: YAMLNode, schema?: SchemaNode): Diagnostic[] {
     if (!schema) {
       if (!node) {
         return [];
@@ -146,16 +145,8 @@ export class FormatValidation {
         }
       }
     } else {
-      if (node.kind !== schema.kind) {
+      if (!schema.validateNode(node)) {
         return [];
-      } else if (node.key) {
-        if (!schema.key) {
-          return [];
-        } else {
-          if ((node.key as YAMLNode).value !== (schema.key as YAMLNode).value) {
-            return [];
-          }
-        }
       }
     }
 
@@ -166,20 +157,11 @@ export class FormatValidation {
           schema,
         );
       case Kind.MAP:
-        return this.validateMap(
-          node as YamlMap,
-          schema ? (schema as YamlMap) : schema,
-        );
+        return this.validateMap(node as YamlMap, schema);
       case Kind.MAPPING:
-        return this.validateMapping(
-          node as YAMLMapping,
-          schema ? (schema as YAMLMapping) : schema,
-        );
+        return this.validateMapping(node as YAMLMapping, schema);
       case Kind.SEQ:
-        return this.validateSequence(
-          node as YAMLSequence,
-          schema ? (schema as YAMLSequence) : schema,
-        );
+        return this.validateSequence(node as YAMLSequence, schema);
       case Kind.SCALAR:
         if (schema) {
           return this.validateScalar(node as YAMLScalar);
@@ -192,12 +174,12 @@ export class FormatValidation {
 
   private validateAnchorReference(
     node: YAMLAnchorReference,
-    schema?: YAMLNode,
+    schema?: SchemaNode,
   ): Diagnostic[] {
     return this.validate(node.value, schema);
   }
 
-  private validateMap(node: YamlMap, schema?: YamlMap): Diagnostic[] {
+  private validateMap(node: YamlMap, schema?: SchemaNode): Diagnostic[] {
     let result: Diagnostic[] = [];
 
     if (!schema) {
@@ -205,14 +187,8 @@ export class FormatValidation {
         result = result.concat(this.validate(mapping, schema));
       });
     } else {
-      const schemaMap = new Map<string, YAMLNode>();
-
-      schema.mappings.forEach(mapping => {
-        schemaMap.set(mapping.key.value, mapping.value);
-      });
-
       node.mappings.forEach(mapping => {
-        const schemaMapping = schemaMap.get(mapping.key.value);
+        const schemaMapping = schema.mappings.get(mapping.key.value);
 
         if (schemaMapping) {
           result = result.concat(this.validate(mapping.value, schemaMapping));
@@ -225,14 +201,20 @@ export class FormatValidation {
 
   private validateMapping(
     node: YAMLMapping,
-    schema?: YAMLMapping,
+    schema?: SchemaNode,
   ): Diagnostic[] {
-    return this.validate(node.value, schema ? schema.value : schema);
+    if (!schema) {
+      return this.validate(node.value);
+    } else if (schema.value) {
+      return this.validate(node.value, schema.value);
+    } else {
+      return [];
+    }
   }
 
   private validateSequence(
     node: YAMLSequence,
-    schema?: YAMLSequence,
+    schema?: SchemaNode,
   ): Diagnostic[] {
     let result: Diagnostic[] = [];
 
@@ -241,27 +223,13 @@ export class FormatValidation {
         result = result.concat(this.validate(item, schema));
       });
     } else {
-      const schemaSequence = new Map<string, YAMLNode>();
-      let validateScalars: boolean = false;
-
-      schema.items.forEach(item => {
-        if (item.kind === Kind.SCALAR && item.value === '$') {
-          validateScalars = true;
-        } else if (item.kind === Kind.MAP) {
-          schemaSequence.set(
-            item.mappings[0].key.value,
-            item.mappings[0].value,
-          );
-        }
-      });
-
       node.items.forEach(item => {
-        if (validateScalars && item.kind === Kind.SCALAR) {
+        if (schema.validateScalars && item.kind === Kind.SCALAR) {
           result = result.concat(this.validateScalar(item as YAMLScalar));
 
           return;
         } else if (item.key) {
-          const schemaItem = schemaSequence.get((item.key as YAMLNode).value);
+          const schemaItem = schema.items.get((item.key as YAMLNode).value);
 
           if (schemaItem) {
             result = result.concat(this.validate(item, schemaItem));
