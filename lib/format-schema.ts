@@ -1,4 +1,5 @@
 import { existsSync } from 'fs';
+import isGlob from 'is-glob';
 import { join } from 'path';
 import {
   Diagnostic,
@@ -190,8 +191,10 @@ export class FormatValidation {
       node.mappings.forEach(mapping => {
         const schemaMapping = schema.mappings.get(mapping.key.value);
 
-        if (schemaMapping) {
-          result = result.concat(this.validate(mapping.value, schemaMapping));
+        if (schemaMapping && schemaMapping.value) {
+          result = result.concat(
+            this.validate(mapping.value, schemaMapping.value),
+          );
         }
       });
     }
@@ -228,12 +231,14 @@ export class FormatValidation {
           result = result.concat(this.validateScalar(item as YAMLScalar));
 
           return;
-        } else if (item.key) {
-          const schemaItem = schema.items.get((item.key as YAMLNode).value);
+        } else if (item.kind === Kind.MAP) {
+          (item as YamlMap).mappings.forEach(mapping => {
+            const schemaItem = schema.items.get(mapping.key.value);
 
-          if (schemaItem) {
-            result = result.concat(this.validate(item, schemaItem));
-          }
+            if (schemaItem) {
+              result = result.concat(this.validate(mapping, schemaItem));
+            }
+          });
         }
       });
     }
@@ -242,7 +247,9 @@ export class FormatValidation {
   }
 
   private validateScalar(node: YAMLScalar): Diagnostic[] {
-    if (existsSync(join(this._subpath, node.value))) {
+    if (isGlob(node.value)) {
+      return [];
+    } else if (existsSync(join(this._subpath, node.value))) {
       return [];
     } else {
       return [
