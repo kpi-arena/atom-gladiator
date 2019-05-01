@@ -41,12 +41,13 @@ class SchemaNode {
 
     this._key = node.key ? (node.key as YAMLNode).value : null;
 
-    this._value = node.value ? new SchemaNode(node.value) : null;
+    this._value =
+      node.kind === Kind.MAPPING ? new SchemaNode(node.value) : null;
 
     switch (node.kind) {
       case Kind.MAP:
         (node as YamlMap).mappings.forEach(mapping => {
-          this._mappings.set(mapping.key.value, new SchemaNode(mapping.value));
+          this._mappings.set(mapping.key.value, new SchemaNode(mapping));
         });
         break;
 
@@ -56,12 +57,28 @@ class SchemaNode {
             this._validateScalars = true;
           } else if (item.kind === Kind.MAP) {
             (item as YamlMap).mappings.forEach(mapping => {
-              this._items.set(mapping.key.value, new SchemaNode(mapping.value));
+              this._items.set(mapping.key.value, new SchemaNode(mapping));
             });
           }
         });
         break;
     }
+  }
+
+  public validateNode(node: YAMLNode): boolean {
+    if (node.kind !== this._kind) {
+      return false;
+    } else if (node.key) {
+      if (!this._key) {
+        return false;
+      } else {
+        if ((node.key as YAMLNode).value !== this._key) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   public get kind(): Kind {
@@ -115,7 +132,6 @@ export class FormatValidation {
     return this.validate(node);
   }
 
-  /* Real stuff */
   private validate(node: YAMLNode, schema?: YAMLNode): Diagnostic[] {
     if (!schema) {
       if (!node) {
