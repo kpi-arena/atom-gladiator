@@ -1,4 +1,3 @@
-import { GlobSync } from 'glob';
 import * as path from 'path';
 import * as cli from './gladiator-cli-adapter';
 
@@ -13,20 +12,6 @@ export function getProjectOrHomePath(): string {
   }
 
   return paths[0];
-}
-
-export function getGladiatorConfPath(): string[] {
-  const result: string[] = [];
-
-  atom.project.getPaths().forEach(projectPath => {
-    const globResult = new GlobSync('**/.gladiator.yml', { cwd: projectPath });
-
-    globResult.found.forEach(match => {
-      result.push(path.join(projectPath, match));
-    });
-  });
-
-  return result;
 }
 
 export function getConfPath(): string | null {

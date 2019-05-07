@@ -1,5 +1,5 @@
 import { Disposable } from 'atom';
-import { exists, readFile } from 'fs';
+import { exists } from 'fs';
 import { join } from 'path';
 import { CONFIG_FILE_NAME } from './gladiator-cli-adapter';
 import { GladiatorConfClient } from './main';
@@ -25,45 +25,45 @@ export class ConfigWatcher {
       this._exists = fileExists;
     });
 
-    this._watcher = atom.project.onDidChangeFiles(events => {
-      for (const event of events) {
-        if (this._configPath === event.path) {
-          switch (event.action) {
-            case 'created':
-            case 'modified':
-            case 'renamed':
-              this._exists = true;
-              readFile(this._configPath, 'utf8', (err, data) => {
-                if (err) {
-                  this._client.deleteTempSchemas();
-                } else {
-                  this.parseConfig(data.toString());
-                  this._client.deleteTempSchemas();
-                  if (this._configValues.problemsetPath) {
-                    this._client.addSchema(
-                      this._configValues.problemsetSchema as string,
-                      this._configValues.problemsetPath,
-                    );
-                  }
+    // this._watcher = atom.project.onDidChangeFiles(events => {
+    //   for (const event of events) {
+    //     if (this._configPath === event.path) {
+    //       switch (event.action) {
+    //         case 'created':
+    //         case 'modified':
+    //         case 'renamed':
+    //           this._exists = true;
+    //           readFile(this._configPath, 'utf8', (err, data) => {
+    //             if (err) {
+    //               this._client.deleteTempSchemas();
+    //             } else {
+    //               this.parseConfig(data.toString());
+    //               this._client.deleteTempSchemas();
+    //               if (this._configValues.problemsetPath) {
+    //                 this._client.addSchema(
+    //                   this._configValues.problemsetSchema as string,
+    //                   this._configValues.problemsetPath,
+    //                 );
+    //               }
 
-                  if (this._configValues.variantsPath) {
-                    this._client.addSchema(
-                      this._configValues.variantSchema as string,
-                      this._configValues.variantsPath,
-                    );
-                  }
-                }
-              });
+    //               if (this._configValues.variantsPath) {
+    //                 this._client.addSchema(
+    //                   this._configValues.variantSchema as string,
+    //                   this._configValues.variantsPath,
+    //                 );
+    //               }
+    //             }
+    //           });
 
-              break;
+    //           break;
 
-            case 'deleted':
-              this._client.deleteTempSchemas();
-              this._exists = false;
-          }
-        }
-      }
-    });
+    //         case 'deleted':
+    //           this._client.deleteTempSchemas();
+    //           this._exists = false;
+    //       }
+    //     }
+    //   }
+    // });
   }
 
   private parseConfig(content: string): boolean {

@@ -1,5 +1,4 @@
 import { CompositeDisposable } from 'atom';
-// import * as atomIde from 'atom-ide';
 import {
   ActiveServer,
   AutoLanguageClient,
@@ -8,107 +7,111 @@ import {
   LanguageServerProcess,
 } from 'atom-languageclient';
 import * as path from 'path';
-import { TextDocument } from 'vscode-languageserver-protocol';
 import * as yaml from 'yaml-ast-parser';
 import { IClientState } from './client-state';
-import { ConfigWatcher } from './config-watcher';
 import { SuperConnection } from './connection';
 import { FormatValidation } from './format-schema';
 import * as cli from './gladiator-cli-adapter';
+import {
+  getAllConfigs,
+  getConfigSchema,
+  getConfigValues,
+  IConfigValues,
+} from './gladiator-config';
 import { getDefaultSettings } from './server-settings';
-import CommandPalleteView, { ArenaPane } from './ui';
+import CommandPalleteView from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
-  private _pane = new ArenaPane(this);
   private _settings = getDefaultSettings();
-  private _config: ConfigWatcher | null = null;
-  private _schemas: Map<string, string> = new Map();
-  // private _configPath: string | null = getExpectedPath();
-  // private _configWatcher: Disposable | null = null;
-  private _fileExists: boolean = false;
-  private _apiUrl: string | null = null;
-  private _variantsPath: string | null = null;
-  private _problemsetPath: string | null = null;
+  private _configValues: Map<string, IConfigValues> = new Map();
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
+  private _format: FormatValidation = new FormatValidation(
+    yaml.safeLoad('leave_this: there'),
+  );
 
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
 
-    this._config = new ConfigWatcher(atom.project.getPaths()[0], this);
-
     if (!cli.isInstalled()) {
       atom.notifications.addFatalError('gladiator-cli is not installed');
-      return false;
-    } else {
-      cli.getSchemaUri().then(
-        value => this.addSchema(value, cli.CONFIG_FILE_NAME),
-
-        // this.addSchema(
-        //   value.replace(/\r?\n|\r/, ''),
-        //   `/${cli.CONFIG_FILE_NAME}`,
-        // ),
-      );
     }
 
-    const format = new FormatValidation(
-      yaml.safeLoad(`
-    package:
-      - $
-      - orig-file: $
-      - directory:
-          into: $
-          include:
-            - $
-          exclude:
-            - $
-    problemset-definition: $
-    problemset-variants: $
-        `),
-    );
-    format.subPath = 'D:\\Develop\\test';
+    /* Looking for all `.gladitor.yml` files in all projects and registering
+    their values to schemas. */
+    getAllConfigs()
+      .then(paths => {
+        paths.forEach(configPath => {
+          getConfigValues(configPath)
+            .then(values => {
+              this._configValues.set(configPath, values);
+            })
+            .catch();
+        });
+      })
+      .then(() =>
+        cli
+          .getConfigFilePath()
+          .then(newPath => {
+            console.log(newPath);
+            if (this._configValues.has(newPath)) {
+              this.sendSettings(this._configValues.get(
+                newPath,
+              ) as IConfigValues);
+            }
+          })
+          .catch(),
+      );
+
+    cli
+      .getGladiatorFormat()
+      .then(value => {
+        this._format = new FormatValidation(yaml.safeLoad(value));
+      })
+      .catch();
 
     this._subscriptions.add(
-      atom.commands.add('atom-workspace', {
-        'gladiator:test': () => {
-          const doc = atom.workspace.getActiveTextEditor();
-
-          if (doc) {
-            format.doc = TextDocument.create(
-              '',
-              '',
-              0,
-              doc.getBuffer().getText(),
-            );
-
-            console.log(
-              format.getDiagnostics(yaml.safeLoad(doc.getBuffer().getText())),
-            );
-            console.log(yaml.safeLoad(doc.getBuffer().getText()));
-            format.getCompletionItems({
-              textDocument: {
-                uri: '',
-              },
-              position: {
-                line: 15,
-                character: 16,
-              },
-            });
+      /* Registering file watcher related to .gladiator.yml files. */
+      atom.project.onDidChangeFiles(events => {
+        for (const event of events) {
+          if (event.path.match(cli.CONFIG_FILE_REGEX)) {
+            switch (event.action) {
+              case 'deleted':
+                this._configValues.delete(event.path);
+                break;
+              default:
+                getConfigValues(event.path)
+                  .then(values => this._configValues.set(event.path, values))
+                  .catch(() => {
+                    this._configValues.delete(event.path);
+                  });
+            }
           }
-        },
-      }),
-      atom.commands.add('atom-workspace', {
-        'gladiator:toggle': () => this._pane.toggle(),
+        }
       }),
 
-      atom.commands.add('atom-workspace', {
-        'gladiator:hide': () => this._pane.hide(),
-      }),
-
-      atom.commands.add('atom-workspace', {
-        'gladiator:show': () => this._pane.show(),
+      atom.workspace.onDidChangeActiveTextEditor(editor => {
+        if (editor && editor.getPath()) {
+          cli
+            .getConfigFilePath()
+            .then(newPath => {
+              if (this._configValues.has(newPath)) {
+                this.sendSettings(this._configValues.get(
+                  newPath,
+                ) as IConfigValues);
+              } else {
+                getConfigValues(newPath)
+                  .then(values => {
+                    this._configValues.set(newPath, values);
+                    this.sendSettings(values);
+                  })
+                  .catch();
+              }
+            })
+            .catch();
+        }
       }),
 
       atom.commands.add('atom-workspace', {
@@ -116,20 +119,13 @@ export class GladiatorConfClient extends AutoLanguageClient {
           cli.generateFilesToDir(this._insertView),
       }),
 
-      // atom.commands.add('atom-workspace', {
-      //   'gladiator:set-config-path': () =>
-      //     insertView.open(
-      //       'Enter the config file path',
-      //       getProjectOrHomePath(),
-      //       'Enter the path to the `.gladiator.yml` config file.',
-      //       config.setPath,
-      //     ),
-      // }),
-
       atom.commands.add('atom-workspace', {
         'gladiator:pack-problemset': () => {
-          if (!this._fileExists) {
-            atom.notifications.addError('Missing .gladiator.yml file');
+          if (this._configValues.size === 1) {
+            cli.problemsetPack(
+              this._insertView,
+              path.dirname(Object.keys(this._configValues)[0]),
+            );
           } else {
             cli.problemsetPack(this._insertView);
           }
@@ -138,11 +134,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
       atom.commands.add('atom-workspace', {
         'gladiator:push-problemset': () => {
-          if (!this._fileExists) {
-            atom.notifications.addError('Missing .gladiator.yml file');
-          } else {
-            cli.problemsetPush(this._insertView);
-          }
+          cli.problemsetPush(this._insertView);
         },
       }),
     );
@@ -152,33 +144,41 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (state.serverSettings) {
       this._settings = state.serverSettings;
     }
-
-    if (state.isPaneActive) {
-      this._pane.show();
-    }
   }
 
   public serialize(): IClientState {
     return {
-      isPaneActive: this._pane.isActive(),
       serverSettings: this._settings,
     };
   }
 
   public deactivate(): Promise<any> {
+    this._subscriptions.dispose();
+
     return super.deactivate();
   }
-
-  // public preInitialization(connection: LanguageClientConnection): void {
-  //   connection.onCustom('$/partialResult', () => {});
-  // }
 
   public postInitialization(_server: ActiveServer): void {
     super.postInitialization(_server);
 
     this._connection = _server.connection;
-
-    this.sendSettings();
+    cli
+      .getConfigFilePath()
+      .then(configPath => {
+        if (this._configValues.has(configPath)) {
+          this.sendSettings(this._configValues.get(
+            configPath,
+          ) as IConfigValues);
+        } else {
+          getConfigValues(configPath)
+            .then(values => {
+              this._configValues.set(configPath, values);
+              this.sendSettings(values);
+            })
+            .catch(() => this.sendSettings({}));
+        }
+      })
+      .catch(() => this.sendSettings({}));
   }
 
   public getGrammarScopes(): string[] {
@@ -196,9 +196,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   public getConnectionType(): ConnectionType {
     return 'stdio';
   }
-  public lol() {
-    console.log('\n\nloool\n\n');
-  }
 
   public startServerProcess(projectPath: string): LanguageServerProcess {
     return super.spawnChildNode([
@@ -210,85 +207,27 @@ export class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  public addSchema(schema: string, pattern: string): void {
-    this._schemas.set(schema, pattern);
-
-    this.sendSchemas();
-  }
-
-  public deleteScehma(schema: string) {
-    this._schemas.delete(schema);
-
-    this.sendSchemas();
-  }
-
-  public sendSchema(schema: string, pattern: string) {
-    if (schema.length === 0) {
-      return;
-    }
-
-    this._settings.settings.yaml.schemas = {
-      [schema]: pattern,
-    };
-
-    this.sendSettings();
-  }
-
-  public deleteTempSchemas() {
-    this._schemas = new Map();
-    cli.getSchemaUri().then(value => {
-      this.addSchema(value, cli.CONFIG_FILE_NAME);
-      this.sendSchemas();
-    });
-  }
-
-  private sendSchemas() {
-    if (this._schemas.size === 0) {
-      return;
-    }
-
+  private sendSettings(values: IConfigValues) {
     this._settings.settings.yaml.schemas = {};
 
-    this._schemas.forEach((pattern, schemaUri) => {
-      this._settings.settings.yaml.schemas[schemaUri] = pattern;
-    });
+    const configSchema = getConfigSchema();
+    if (configSchema) {
+      this._settings.settings.yaml.schemas[configSchema] = cli.CONFIG_FILE_NAME;
+    }
 
-    this.sendSettings();
-  }
+    if (values.problemsetSchema && values.problemsetPath) {
+      this._settings.settings.yaml.schemas[values.problemsetSchema] =
+        values.problemsetPath;
+    }
 
-  private sendSettings() {
+    if (values.variantSchema && values.variantsPath) {
+      this._settings.settings.yaml.schemas[values.variantSchema] =
+        values.variantsPath;
+    }
+
     if (this._connection !== null) {
       this._connection.didChangeConfiguration(this._settings);
     }
-  }
-
-  // private checkIfFileExists(filePath: string) {
-  //   if (!this._configPath) {
-  //     return;
-  //   }
-  //   fs.exists(path.join(path.dirname(this._configPath), filePath), (exists) => {
-  //     if (!exists) {
-  //       this.provideCodeFormat
-  //     }
-  //   });
-  // }
-
-  private getMatch(
-    content: string,
-    matcher: RegExp,
-    desiredGroup: number,
-  ): string | null {
-    const match = content.match(matcher);
-
-    if (!match || !match[desiredGroup]) {
-      return null;
-    }
-
-    return match[desiredGroup];
-  }
-
-  private getName(text: string): string {
-    return text.replace(/^.*[\\\/]/, '');
   }
 
   /**

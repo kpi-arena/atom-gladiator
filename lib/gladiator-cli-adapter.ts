@@ -1,10 +1,15 @@
 import { BufferedProcess, ProcessOptions } from 'atom';
 import * as path from 'path';
+import { getAllConfigs } from './gladiator-config';
 import CommandPalleteView from './ui';
 import { getProjectOrHomePath } from './util';
 
-export const CONFIG_FILE_REGEX = /\/?.gladiator.(yml|yaml)$/;
+export const CONFIG_FILE_REGEX = /\/\.gladiator\.(yml)$/;
 export const CONFIG_FILE_NAME = '.gladiator.yml';
+export const PROBLEMSET_URL =
+  '/gladiator/api/v2/utils/schema/problemset-definition';
+export const VARIANTS_URL =
+  '/gladiator/api/v2/utils/schema/problemset-variants';
 
 export function isInstalled(): Promise<boolean> {
   return getProcessPromise([], { silent: true })
@@ -25,7 +30,7 @@ export function getSchemaUri(): Promise<string> {
   // });
   return new Promise<string>((resolve, reject) => {
     const command = 'gladiator';
-    const args = ['schema', '-u'];
+    const args = ['files', 'schema', '-u'];
     const stdout = (data: string): void => resolve(data);
     const stderr = (data: string): void => reject(data);
     const process = new BufferedProcess({ command, args, stdout, stderr });
@@ -38,24 +43,34 @@ export function generateFilesToDir(view: CommandPalleteView): void {
     getProjectOrHomePath(),
     'Enter the path of the directory in which the files will be generated.',
     (input: string) => {
-      getProcessPromise(['generate', '-d', input], {}).then(() => {
-        if (atom.project.getPaths().indexOf(input) < 0) {
-          atom.open({
-            pathsToOpen: [input, path.join(input, CONFIG_FILE_NAME)],
-            newWindow: true,
-          });
-        } else {
-          atom.open({
-            pathsToOpen: [path.join(input, CONFIG_FILE_NAME)],
-          });
-        }
+      getProcessPromise(['files', 'generate', '-d', input], {}).then(() => {
+        atom.open({
+          pathsToOpen: [path.join(input, CONFIG_FILE_NAME)],
+        });
       });
     },
   );
 }
 
-export function problemsetPack(view: CommandPalleteView) {
+export function getConfigFilePath(): Promise<string> {
   const scriptPath = getScriptPath();
+
+  if (!scriptPath) {
+    atom.notifications.addError(`Can't determine where to look for file`, {
+      description: `Please open a file (or make an editor active).`,
+    });
+  }
+
+  return getProcessPromise(['files', 'config-path'], {
+    scriptPath,
+    silent: true,
+  });
+}
+
+export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
+  if (!scriptPath) {
+    scriptPath = getScriptPath();
+  }
 
   if (!scriptPath) {
     return;
@@ -117,6 +132,10 @@ export function dockerImagePack() {
   getProcessPromise(['docker-image', 'pack'], { scriptPath });
 }
 
+export function getGladiatorFormat() {
+  return getProcessPromise(['files', 'gladiator-format'], { silent: true });
+}
+
 export function dockerImageBuild() {
   const scriptPath = getScriptPath();
 
@@ -171,14 +190,14 @@ function getProcessPromise(
           });
         }
 
-        resolve(message);
+        resolve(message.trim());
       } else {
         if (!opt.silent) {
           atom.notifications.addError('gladiator-cli error', {
             description: message,
           });
         }
-        reject(message);
+        reject(message.trim());
       }
     };
 
@@ -196,34 +215,18 @@ function getProcessPromise(
   });
 }
 
-function getScriptPath(): string | null {
+function getScriptPath(): string | undefined {
   const editor = atom.workspace.getActiveTextEditor();
 
-  if (editor) {
-    const editorPath = editor.getPath();
-
-    if (editorPath && atom.project.getPaths().length === 0) {
-      return path.dirname(editorPath);
-    } else if (editorPath) {
-      let result: string | null = null;
-
-      atom.project.getDirectories().forEach(dir => {
-        if (dir.contains(editorPath)) {
-          result = dir.getPath();
-        }
-      });
-
-      if (result) {
-        return result;
-      }
-    }
-  }
-
-  if (atom.project.getPaths().length > 0) {
-    return atom.project.getPaths()[0];
+  if (editor && editor.getPath()) {
+    return path.dirname(editor.getPath() as string);
   } else {
-    atom.notifications.addError('Please open project to execute this command');
-
-    return null;
+    getAllConfigs().then(configPaths => {
+      if (configPaths.length === 1) {
+        return path.dirname(configPaths[0]);
+      }
+    });
   }
+
+  return undefined;
 }
