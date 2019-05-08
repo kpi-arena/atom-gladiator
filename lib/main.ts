@@ -9,7 +9,6 @@ import {
 import * as path from 'path';
 import * as yaml from 'yaml-ast-parser';
 import { IClientState } from './client-state';
-import { SuperConnection } from './connection';
 import { FormatValidation } from './format-schema';
 import * as cli from './gladiator-cli-adapter';
 import {
@@ -19,6 +18,7 @@ import {
   IConfigValues,
 } from './gladiator-config';
 import { getDefaultSettings } from './server-settings';
+import { SuperConnection } from './super-connection';
 import CommandPalleteView from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
@@ -28,7 +28,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
   private _format: FormatValidation = new FormatValidation(
-    yaml.safeLoad('leave_this: there'),
+    yaml.safeLoad('leave_this: here'),
   );
 
   // @ts-ignore

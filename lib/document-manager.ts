@@ -44,7 +44,7 @@ export interface ILinesRelation {
 declare type refErrType = 0 | 1 | 2 | 3 | 4;
 
 /** Used when the file specified by `include` or `root` comment canoot be found. */
-class ReferenceError extends Error {
+export class ReferenceError extends Error {
   /* Item at index + 1 is an error message to 'refErrType'. */
   private static readonly _errorMessages: Array<
     [string, DiagnosticSeverity]
@@ -111,28 +111,6 @@ export class SuperDocument {
     return doc;
   }
 
-  private static getFileContent(
-    filePath: string,
-    editorDocs: Map<string, TextDocument>,
-  ): string {
-    let result: string;
-    const doc = SuperDocument.getOpenYAMLDocuments().get(filePath);
-
-    /* Checking if the document is open in the editor. In case it's not, get
-    the doc from the drive. */
-    if (!doc) {
-      try {
-        result = readFileSync(filePath).toString();
-      } catch (err) {
-        result = '';
-      }
-    } else {
-      result = doc.getText();
-    }
-
-    return result;
-  }
-
   /**
    * Creates a map from YAML documents in current workspace. Key value in the
    * map represents path to the document. The value is a TextDocument created
@@ -140,7 +118,7 @@ export class SuperDocument {
    * have a path it's ignored, since for including documents in other documents
    * a path is required.
    */
-  private static getOpenYAMLDocuments(): Map<string, TextDocument> {
+  public static getOpenYAMLDocuments(): Map<string, TextDocument> {
     const result: Map<string, TextDocument> = new Map();
 
     atom.workspace.getTextEditors().forEach(editor => {
@@ -162,6 +140,28 @@ export class SuperDocument {
         ),
       );
     });
+
+    return result;
+  }
+
+  private static getFileContent(
+    filePath: string,
+    editorDocs: Map<string, TextDocument>,
+  ): string {
+    let result: string;
+    const doc = SuperDocument.getOpenYAMLDocuments().get(filePath);
+
+    /* Checking if the document is open in the editor. In case it's not, get
+    the doc from the drive. */
+    if (!doc) {
+      try {
+        result = readFileSync(filePath).toString();
+      } catch (err) {
+        result = '';
+      }
+    } else {
+      result = doc.getText();
+    }
 
     return result;
   }
