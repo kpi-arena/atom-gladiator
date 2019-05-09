@@ -236,7 +236,7 @@ export class GladiatorStatusView {
 
   constructor(private _statusBar: any) {
     this._element.classList.add('inline-block');
-    this._tooltipLink.classList.add('icon', 'icon-hubot');
+    this._tooltipLink.classList.add('icon', 'icon-gist');
 
     this._element.appendChild(this._tooltipLink);
 
@@ -253,6 +253,8 @@ export class GladiatorStatusView {
     if (!configFound) {
       this._element.style.display = 'none';
     } else {
+      this._element.style.display = '';
+
       if (this._tooltip) {
         this._tooltip.dispose();
       }
@@ -268,6 +270,6 @@ export class GladiatorStatusView {
   }
 
   private attach() {
-    this._statusBar.addRightTile({ priority: 100, item: this._element });
+    this._statusBar.addRightTile({ priority: 170, item: this._element });
   }
 }
