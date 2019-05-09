@@ -17,7 +17,7 @@ import {
 } from './gladiator-config';
 import { getDefaultSettings } from './server-settings';
 import { GladiatorConnection } from './super-connection';
-import CommandPalleteView from './ui';
+import CommandPalleteView, { GladiatorStatusView } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
@@ -25,6 +25,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _configValues: Map<string, IConfigValues> = new Map();
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
+  private _statusView: GladiatorStatusView | null = null;
+  private ele = document.createElement('a');
 
   // @ts-ignore
   public activate(state: IClientState) {
@@ -54,6 +56,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
               this.sendSettings(this._configValues.get(
                 newPath,
               ) as IConfigValues);
+
+              this.updateStatusBar(newPath);
             }
           })
           .catch(),
@@ -73,6 +77,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
                   .then(values => {
                     this.sendSettings(values);
                     this._configValues.set(event.path, values);
+                    this.updateStatusBar(event.path);
                   })
                   .catch(() => {
                     this._configValues.delete(event.path);
@@ -99,6 +104,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
                   })
                   .catch();
               }
+
+              this.updateStatusBar(newPath);
             })
             .catch();
         }
@@ -136,6 +143,11 @@ export class GladiatorConfClient extends AutoLanguageClient {
     }
   }
 
+  public consumeStatusBar(statusBar: any) {
+    this._statusView = new GladiatorStatusView(statusBar);
+    this.updateStatusBar();
+  }
+
   public serialize(): IClientState {
     return {
       serverSettings: this._settings,
@@ -167,6 +179,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
             })
             .catch(() => this.sendSettings({}));
         }
+
+        this.updateStatusBar(configPath);
       })
       .catch(() => this.sendSettings({}));
   }
@@ -217,6 +231,14 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     if (this._connection !== null) {
       this._connection.didChangeConfiguration(this._settings);
+    }
+  }
+
+  private updateStatusBar(rootpath?: string) {
+    if (rootpath && this._statusView) {
+      this._statusView.update(true, rootpath);
+    } else if (this._statusView) {
+      this._statusView.update(false);
     }
   }
 

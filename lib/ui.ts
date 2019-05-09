@@ -1,4 +1,4 @@
-import { Panel, TextBuffer, TextEditor } from 'atom';
+import { Disposable, Panel, TextBuffer, TextEditor } from 'atom';
 import { GladiatorConfClient } from './main';
 
 // tslint:disable-next-line: no-var-requires
@@ -226,4 +226,48 @@ export default class CommandPalleteView {
   }
 
   private callback: (text: string) => void = (text: string) => {};
+}
+
+export class GladiatorStatusView {
+  private _element = document.createElement('encoding-selector-status');
+  private _tooltipLink = document.createElement('span');
+  private _tooltip: Disposable = new Disposable();
+  private _configPath: string | undefined;
+
+  constructor(private _statusBar: any) {
+    this._element.classList.add('inline-block');
+    this._tooltipLink.classList.add('icon', 'icon-hubot');
+
+    this._element.appendChild(this._tooltipLink);
+
+    this._element.addEventListener('click', () => {
+      if (this._configPath) {
+        atom.workspace.open(this._configPath);
+      }
+    });
+
+    this.attach();
+  }
+
+  public update(configFound: boolean, configPath?: string) {
+    if (!configFound) {
+      this._element.style.display = 'none';
+    } else {
+      if (this._tooltip) {
+        this._tooltip.dispose();
+      }
+
+      // this._tooltipLink.textContent = 'A';
+
+      this._configPath = configPath;
+
+      this._tooltip = atom.tooltips.add(this._tooltipLink, {
+        title: `${configPath ? configPath : ''}`,
+      });
+    }
+  }
+
+  private attach() {
+    this._statusBar.addRightTile({ priority: 100, item: this._element });
+  }
 }
