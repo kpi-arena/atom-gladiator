@@ -32,6 +32,7 @@ export class GladiatorConnection extends LanguageClientConnection {
   public addSpecialDoc(doc: SpecialDocument) {
     this._docs = doc.relatedPaths;
     this._versions.set(doc, 0);
+    super.didOpenTextDocument(doc.getDidOpen());
   }
 
   public set format(format: FormatValidation | null) {
@@ -39,13 +40,15 @@ export class GladiatorConnection extends LanguageClientConnection {
   }
 
   public deteleSpecialDocs() {
+    this._docs.forEach(doc => {
+      super.didCloseTextDocument(doc.getDidClose());
+    });
     this._docs = new Map();
     this._versions = new Map();
   }
 
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
-    if (this._docs.has(params.textDocument.uri)) {
-    } else {
+    if (!this._docs.has(params.textDocument.uri)) {
       super.didOpenTextDocument(params);
     }
   }
@@ -111,7 +114,9 @@ export class GladiatorConnection extends LanguageClientConnection {
   }
 
   public didCloseTextDocument(params: DidCloseTextDocumentParams): void {
-    // TODO: check how to does this effect the extension.
+    if (!this._docs.has(params.textDocument.uri)) {
+      super.didCloseTextDocument(params);
+    }
   }
 
   public onPublishDiagnostics(

@@ -3,6 +3,8 @@ import * as path from 'path';
 import {
   CompletionParams,
   DidChangeTextDocumentParams,
+  DidCloseTextDocumentParams,
+  DidOpenTextDocumentParams,
   DidSaveTextDocumentParams,
   Position,
   PublishDiagnosticsParams,
@@ -13,7 +15,11 @@ import {
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { IncludeError } from './include-error';
-import { getBasicTextDocument, getOpenYAMLDocuments } from './util';
+import {
+  getBasicTextDocument,
+  getOpenYAMLDocuments,
+  LANGUAGE_ID,
+} from './util';
 
 /**
  * Represents relation between an original line in document given by URI and
@@ -60,6 +66,22 @@ export class SpecialDocument {
     return this._rootPath;
   }
 
+  /**
+   * Used when the document, or any of the subdocuments is opened. The params
+   * are in context of the whole document, so diagnostics are returned for all
+   * retlated files - use `filterDiagnostics` for filter them.
+   */
+  public getDidOpen(): DidOpenTextDocumentParams {
+    return {
+      textDocument: {
+        languageId: LANGUAGE_ID,
+        text: this._content,
+        uri: Convert.pathToUri(this._rootPath),
+        version: 0,
+      },
+    };
+  }
+
   public getDidChange(docVer: number): DidChangeTextDocumentParams {
     return {
       contentChanges: [{ text: this._content }],
@@ -90,6 +112,14 @@ export class SpecialDocument {
       textDocument: {
         uri: Convert.pathToUri(this._rootPath),
         version: params.textDocument.version,
+      },
+    };
+  }
+
+  public getDidClose(): DidCloseTextDocumentParams {
+    return {
+      textDocument: {
+        uri: Convert.pathToUri(this._rootPath),
       },
     };
   }
