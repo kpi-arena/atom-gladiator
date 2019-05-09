@@ -1,4 +1,5 @@
-import { Convert, LanguageClientConnection } from 'atom-languageclient';
+import { Convert, LanguageClientConnection, Logger } from 'atom-languageclient';
+import { MessageConnection } from 'vscode-jsonrpc';
 import {
   CancellationToken,
   CompletionItem,
@@ -19,7 +20,7 @@ import {
 } from 'vscode-languageserver-protocol';
 import { safeLoad } from 'yaml-ast-parser';
 import { FormatValidation } from './format-schema';
-import { CONFIG_FILE_REGEX } from './gladiator-cli-adapter';
+import { CONFIG_FILE_REGEX, getGladiatorFormat } from './gladiator-cli-adapter';
 import { SingleFileOutline } from './outline';
 import { SpecialDocument } from './special-document';
 import { getOpenYAMLDocuments } from './util';
@@ -28,6 +29,18 @@ export class GladiatorConnection extends LanguageClientConnection {
   private _docs: Map<string, SpecialDocument> = new Map();
   private _versions: Map<SpecialDocument, number> = new Map();
   private _format: FormatValidation | null = null;
+
+  constructor(rpc: MessageConnection, logger?: Logger) {
+    super(rpc, logger);
+
+    getGladiatorFormat()
+      .then(value => {
+        this._format = new FormatValidation(safeLoad(value));
+      })
+      .catch(() => {
+        this._format = null;
+      });
+  }
 
   public addSpecialDoc(doc: SpecialDocument) {
     this._docs = doc.relatedPaths;
@@ -43,6 +56,7 @@ export class GladiatorConnection extends LanguageClientConnection {
     this._docs.forEach(doc => {
       super.didCloseTextDocument(doc.getDidClose());
     });
+
     this._docs = new Map();
     this._versions = new Map();
   }
