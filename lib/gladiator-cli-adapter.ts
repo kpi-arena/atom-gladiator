@@ -4,7 +4,7 @@ import { getAllConfigs } from './gladiator-config';
 import CommandPalleteView from './ui';
 import { getProjectOrHomePath } from './util';
 
-export const CONFIG_FILE_REGEX = /\/\.gladiator\.(yml)$/;
+export const CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
 export const CONFIG_FILE_NAME = '.gladiator.yml';
 export const PROBLEMSET_URL =
   '/gladiator/api/v2/utils/schema/problemset-definition';

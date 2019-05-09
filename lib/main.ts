@@ -7,9 +7,7 @@ import {
   LanguageServerProcess,
 } from 'atom-languageclient';
 import * as path from 'path';
-import * as yaml from 'yaml-ast-parser';
 import { IClientState } from './client-state';
-import { FormatValidation } from './format-schema';
 import * as cli from './gladiator-cli-adapter';
 import {
   getAllConfigs,
@@ -27,9 +25,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _configValues: Map<string, IConfigValues> = new Map();
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
-  private _format: FormatValidation = new FormatValidation(
-    yaml.safeLoad('leave_this: here'),
-  );
 
   // @ts-ignore
   public activate(state: IClientState) {
@@ -55,7 +50,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
         cli
           .getConfigFilePath()
           .then(newPath => {
-            console.log(newPath);
             if (this._configValues.has(newPath)) {
               this.sendSettings(this._configValues.get(
                 newPath,
@@ -64,13 +58,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
           })
           .catch(),
       );
-
-    cli
-      .getGladiatorFormat()
-      .then(value => {
-        this._format = new FormatValidation(yaml.safeLoad(value));
-      })
-      .catch();
 
     this._subscriptions.add(
       /* Registering file watcher related to .gladiator.yml files. */
@@ -83,7 +70,10 @@ export class GladiatorConfClient extends AutoLanguageClient {
                 break;
               default:
                 getConfigValues(event.path)
-                  .then(values => this._configValues.set(event.path, values))
+                  .then(values => {
+                    this.sendSettings(values);
+                    this._configValues.set(event.path, values);
+                  })
                   .catch(() => {
                     this._configValues.delete(event.path);
                   });
