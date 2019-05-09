@@ -1,6 +1,6 @@
 import { Convert, LanguageClientConnection } from 'atom-languageclient';
-import { CancellationToken } from 'vscode-jsonrpc';
 import {
+  CancellationToken,
   CompletionItem,
   CompletionList,
   CompletionParams,
@@ -13,130 +13,79 @@ import {
   Hover,
   PublishDiagnosticsParams,
   SymbolInformation,
-  TextDocument,
   TextDocumentPositionParams,
   TextEdit,
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { safeLoad } from 'yaml-ast-parser';
-import { SuperDocument } from './document-manager';
 import { FormatValidation } from './format-schema';
+import { CONFIG_FILE_REGEX } from './gladiator-cli-adapter';
 import { SingleFileOutline } from './outline';
+import { SpecialDocument } from './special-document';
+import { getOpenYAMLDocuments } from './util';
 
-export class SuperConnection extends LanguageClientConnection {
-  /* Mapping URIs to their SuperDocuments. Key is an URI and the value is an
-  SuperDocument with all the includes resolved. */
-  private _docs: Map<string, SuperDocument> = new Map();
-  /* Mapping URIs to their current version. Key: URI, value: version number. */
-  private _versions: Map<string, number> = new Map();
+export class GladiatorConnection extends LanguageClientConnection {
+  private _docs: Map<string, SpecialDocument> = new Map();
+  private _versions: Map<SpecialDocument, number> = new Map();
+  private _format: FormatValidation | null = null;
 
-  private _format: Map<string, FormatValidation> = new Map();
-
-  private _singleFileDocs: Map<string, TextDocument> = new Map();
-
-  public addFormat(uri: string, format: FormatValidation) {
-    this._format.set(uri, format);
+  public addSpecialDoc(doc: SpecialDocument) {
+    this._docs = doc.relatedPaths;
+    this._versions.set(doc, 0);
   }
 
-  /* Only calls super method, if the doc wasn't opened direcly/via include ref.
-  Otherwise Atom has the diagnostics already in the memory thanks to other doc. */
+  public set format(format: FormatValidation | null) {
+    this._format = format;
+  }
+
+  public deteleSpecialDocs() {
+    this._docs = new Map();
+    this._versions = new Map();
+  }
+
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
-    /* If doc wasn't open yet, creating new SuperDocument from params. */
-    if (!this._docs.has(params.textDocument.uri)) {
-      const doc = new SuperDocument(
-        params.textDocument.text,
-        params.textDocument.uri,
-        params.textDocument.version,
-      );
-
-      /* Assigning SuperDocument and initial version to all subdocuments. */
-      doc.relatedUris.forEach(uri => {
-        this._docs.set(uri, doc);
-        this._versions.set(uri, params.textDocument.version);
-      });
-
-      this._singleFileDocs = doc.subDocuments;
-
-      super.didOpenTextDocument(doc.DidOpenTextDocumentParams);
+    if (this._docs.has(params.textDocument.uri)) {
+    } else {
+      super.didOpenTextDocument(params);
     }
   }
 
   public didChangeTextDocument(params: DidChangeTextDocumentParams): void {
-    let docVersion = this._versions.get(params.textDocument.uri);
-    /* Increasing version number of all related docs. */
-    if (docVersion) {
-      docVersion++;
+    if (this._docs.has(params.textDocument.uri)) {
+      const doc = this._docs.get(params.textDocument.uri) as SpecialDocument;
 
-      for (const key of this._versions.keys()) {
-        if (key === params.textDocument.uri) {
-          this._versions.set(key, docVersion);
-        }
-      }
+      const version = (this._versions.get(doc) as number) + 1;
+      this._versions.delete(doc);
+
+      const newDoc = new SpecialDocument(doc.rootPath);
+      this._docs = newDoc.relatedPaths;
+
+      super.didChangeTextDocument(newDoc.getDidChange(version));
+    } else {
+      super.didChangeTextDocument(params);
     }
-
-    const doc = new SuperDocument(
-      params.contentChanges[0].text,
-      params.textDocument.uri,
-      docVersion ? docVersion : 1,
-    );
-
-    const relatedUris = doc.relatedUris;
-    this._singleFileDocs = doc.subDocuments;
-
-    this._docs.forEach((value, key) => {
-      /* If doc was related before, but now it's not, it's need to send to the
-      server to get the correct diagnostics for it. */
-      if (relatedUris.indexOf(key) < 0 && doc.uri === value.uri) {
-        const unrelatedDoc = SuperDocument.getBasicTextDocument(
-          Convert.uriToPath(key),
-        );
-
-        if (unrelatedDoc) {
-          super.didChangeTextDocument({
-            contentChanges: [
-              {
-                text: unrelatedDoc.getText(),
-              },
-            ],
-            textDocument: {
-              uri: key,
-              /* Version needs to be atleast = 1, otherwise server will ignore it */
-              version: docVersion ? docVersion : 1,
-            },
-          });
-        }
-      }
-    });
-
-    relatedUris.forEach(uri => {
-      this._docs.set(uri, doc);
-    });
-
-    super.didChangeTextDocument(doc.DidChangeTextDocumentParams);
   }
 
   public willSaveTextDocument(params: WillSaveTextDocumentParams): void {
-    const doc = this._docs.get(params.textDocument.uri);
-
-    if (doc) {
+    if (this._docs.has(params.textDocument.uri)) {
       return super.willSaveTextDocument(
-        doc.getwillSaveTextDocumentParams(params),
+        (this._docs.get(
+          params.textDocument.uri,
+        ) as SpecialDocument).getwillSave(params),
       );
+    } else {
+      return super.willSaveTextDocument(params);
     }
-
-    return super.willSaveTextDocument(params);
   }
 
   public willSaveWaitUntilTextDocument(
     params: WillSaveTextDocumentParams,
   ): Promise<TextEdit[] | null> {
-    const doc = this._docs.get(params.textDocument.uri);
+    if (this._docs.has(params.textDocument.uri)) {
+      const doc = this._docs.get(params.textDocument.uri) as SpecialDocument;
 
-    if (doc) {
       return super
-        .willSaveWaitUntilTextDocument(
-          doc.getwillSaveTextDocumentParams(params),
-        )
+        .willSaveWaitUntilTextDocument(doc.getwillSave(params))
         .then(value => {
           if (!value) {
             return value;
@@ -144,16 +93,18 @@ export class SuperConnection extends LanguageClientConnection {
 
           return doc.transformTextEditArray(value);
         });
+    } else {
+      return super.willSaveWaitUntilTextDocument(params);
     }
-
-    return super.willSaveWaitUntilTextDocument(params);
   }
 
   public didSaveTextDocument(params: DidSaveTextDocumentParams): void {
-    const doc = this._docs.get(params.textDocument.uri);
-
-    if (doc) {
-      super.didSaveTextDocument(doc.getDidSaveTextDocumentParams(params));
+    if (this._docs.has(params.textDocument.uri)) {
+      super.didSaveTextDocument(
+        (this._docs.get(params.textDocument.uri) as SpecialDocument).getDidSave(
+          params,
+        ),
+      );
     } else {
       super.didSaveTextDocument(params);
     }
@@ -167,26 +118,24 @@ export class SuperConnection extends LanguageClientConnection {
     callback: (params: PublishDiagnosticsParams) => void,
   ): void {
     const newCallback = (params: PublishDiagnosticsParams) => {
-      if (
-        this._format.has(params.uri) &&
-        this._singleFileDocs.has(params.uri)
-      ) {
-        const singleDoc = this._singleFileDocs.get(params.uri) as TextDocument;
-        const format = this._format.get(params.uri) as FormatValidation;
-
-        format.doc = singleDoc;
-
-        params.diagnostics = params.diagnostics.concat(
-          format.getDiagnostics(safeLoad(singleDoc.getText())),
+      if (this._format && params.uri.match(CONFIG_FILE_REGEX)) {
+        const formatDoc = getOpenYAMLDocuments().get(
+          Convert.pathToUri(params.uri),
         );
-      }
 
-      const doc = this._docs.get(params.uri);
+        if (formatDoc) {
+          params.diagnostics = params.diagnostics.concat(
+            this._format.getDiagnostics(safeLoad(formatDoc.getText())),
+          );
+        }
 
-      if (doc) {
-        doc.filterDiagnostics(params).forEach(filteredParams => {
-          callback(filteredParams);
-        });
+        callback(params);
+      } else if (this._docs.has(params.uri)) {
+        (this._docs.get(params.uri) as SpecialDocument)
+          .filterDiagnostics(params)
+          .forEach(filteredParams => {
+            callback(filteredParams);
+          });
       } else {
         callback(params);
       }
@@ -212,21 +161,25 @@ export class SuperConnection extends LanguageClientConnection {
   }
 
   public hover(params: TextDocumentPositionParams): Promise<Hover | null> {
-    const doc = this._docs.get(params.textDocument.uri);
-
-    if (doc) {
-      return super.hover(doc.getTextDocumentPositionParams(params));
+    if (this._docs.has(params.textDocument.uri)) {
+      return super.hover(
+        (this._docs.get(
+          params.textDocument.uri,
+        ) as SpecialDocument).getTextDocumentPositionParams(params),
+      );
+    } else {
+      return super.hover(params);
     }
-
-    return super.hover(params);
   }
 
   public documentSymbol(
     params: DocumentSymbolParams,
     cancellationToken?: CancellationToken,
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    const doc = this._singleFileDocs.get(params.textDocument.uri);
-    // const doc = this._docs.get(params.textDocument.uri);
+    const doc = getOpenYAMLDocuments().get(
+      Convert.pathToUri(params.textDocument.uri),
+    );
+
     if (doc) {
       return new Promise(resolve => {
         const outline = new SingleFileOutline(doc);
@@ -235,7 +188,15 @@ export class SuperConnection extends LanguageClientConnection {
         resolve(res);
       });
     }
-
-    return super.documentSymbol(params, cancellationToken);
+    if (doc) {
+      return new Promise(resolve => {
+        const outline = new SingleFileOutline(doc);
+        // const outline = new ScoreOutline(doc);
+        const res = outline.parseFile();
+        resolve(res);
+      });
+    } else {
+      return super.documentSymbol(params, cancellationToken);
+    }
   }
 }

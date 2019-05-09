@@ -18,7 +18,7 @@ import {
   IConfigValues,
 } from './gladiator-config';
 import { getDefaultSettings } from './server-settings';
-import { SuperConnection } from './super-connection';
+import { GladiatorConnection } from './super-connection';
 import CommandPalleteView from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
@@ -242,7 +242,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     );
     // @ts-ignore
     super.captureServerErrors(process, projectPath);
-    const connection = new SuperConnection(
+    const connection = new GladiatorConnection(
       // @ts-ignore
       super.createRpcConnection(process),
       this.logger,
