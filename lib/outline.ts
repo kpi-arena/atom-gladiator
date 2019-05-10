@@ -1,3 +1,4 @@
+import { Convert } from 'atom-languageclient';
 import {
   DocumentSymbol,
   Position,
@@ -16,6 +17,7 @@ import {
   YAMLSequence,
 } from 'yaml-ast-parser';
 import { SpecialDocument } from './special-document';
+import { LANGUAGE_ID } from './util';
 
 export class SingleFileOutline {
   constructor(private _doc: TextDocument) {}
@@ -284,14 +286,22 @@ export class ScoreOutline {
     SymbolKind.Constant,
   ];
 
-  constructor(private _superDoc: SpecialDocument) {}
+  private _textDoc: TextDocument;
+
+  constructor(private _superDoc: SpecialDocument) {
+    this._textDoc = TextDocument.create(
+      Convert.pathToUri(this._superDoc.rootPath),
+      LANGUAGE_ID,
+      0,
+      _superDoc.content,
+    );
+  }
 
   public getOutline(): DocumentSymbol[] {
     const tasks = this.getTasksArray(load(this._superDoc.content));
-    console.log(tasks);
 
     if (tasks) {
-      return this.parseTasks(tasks)[0];
+      return this.parseTasks(tasks, this._superDoc.rootPath)[0];
     }
 
     return [];
@@ -322,13 +332,16 @@ export class ScoreOutline {
     return result;
   }
 
-  private parseTasks(node: YAMLSequence): [DocumentSymbol[], number] {
+  private parseTasks(
+    node: YAMLSequence,
+    currentUri: string,
+  ): [DocumentSymbol[], number] {
     const result: DocumentSymbol[] = [];
 
     let score: number = 0;
 
     node.items.forEach(item => {
-      const subResult = this.parseGenericTask(item);
+      const subResult = this.parseGenericTask(item, currentUri);
 
       if (subResult[0]) {
         result.push(subResult[0]);
@@ -339,7 +352,10 @@ export class ScoreOutline {
     return [result, score];
   }
 
-  private parseGenericTask(node: YAMLNode): [DocumentSymbol | null, number] {
+  private parseGenericTask(
+    node: YAMLNode,
+    currentUri: string,
+  ): [DocumentSymbol | null, number] {
     if (node.kind === Kind.MAP) {
       let result: ITask = {
         type: -1,
@@ -363,9 +379,16 @@ export class ScoreOutline {
       const tasks = this.getTasksArray(node);
 
       if (result.type === 0 && tasks) {
-        const suite = this.parseTasks(tasks);
+        const suite = this.parseTasks(tasks, currentUri);
         children = suite[0];
         result.score += suite[1];
+      }
+
+      if (
+        this._superDoc.getOriginUri(
+          this._textDoc.positionAt(node.startPosition).line,
+        ) !== currentUri
+      ) {
       }
 
       return [

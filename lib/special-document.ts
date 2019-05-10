@@ -293,6 +293,14 @@ export class SpecialDocument {
     };
   }
 
+  public getOriginUri(line: number) {
+    if (this._newToOld[line]) {
+      return this._newToOld[line].originUri;
+    } else {
+      return Convert.pathToUri(this._rootPath);
+    }
+  }
+
   private buildDocument(
     newContent: string,
     docPath: string,
