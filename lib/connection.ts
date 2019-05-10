@@ -174,10 +174,8 @@ export class SuperConnection extends LanguageClientConnection {
         const singleDoc = this._singleFileDocs.get(params.uri) as TextDocument;
         const format = this._format.get(params.uri) as FormatValidation;
 
-        format.doc = singleDoc;
-
         params.diagnostics = params.diagnostics.concat(
-          format.getDiagnostics(safeLoad(singleDoc.getText())),
+          format.getDiagnostics(safeLoad(singleDoc.getText()), singleDoc),
         );
       }
 

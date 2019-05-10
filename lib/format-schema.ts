@@ -37,7 +37,7 @@ class SchemaNode {
   private _key: string | null;
   private _value: SchemaNode | null;
   private _mappings: Map<string, SchemaNode> = new Map();
-  private _items: Map<string, SchemaNode> = new Map();
+  private _items: SchemaNode[] = [];
   private _validateScalars: boolean = false;
 
   constructor(node: YAMLNode) {
@@ -61,7 +61,8 @@ class SchemaNode {
             this._validateScalars = true;
           } else if (item.kind === Kind.MAP) {
             (item as YamlMap).mappings.forEach(mapping => {
-              this._items.set(mapping.key.value, new SchemaNode(mapping));
+              this._items.push(new SchemaNode(mapping));
+              // this._items.set(mapping.key.value, new SchemaNode(mapping));
             });
           }
         });
@@ -76,7 +77,9 @@ class SchemaNode {
       if (!this._key) {
         return false;
       } else {
-        if ((node.key as YAMLNode).value !== this._key) {
+        if (this._key === '$') {
+          return true;
+        } else if ((node.key as YAMLNode).value !== this._key) {
           return false;
         }
       }
@@ -101,7 +104,7 @@ class SchemaNode {
     return this._mappings;
   }
 
-  public get items(): Map<string, SchemaNode> {
+  public get items(): SchemaNode[] {
     return this._items;
   }
 
@@ -133,12 +136,10 @@ export class FormatValidation {
     this._subpath = subPath;
   }
 
-  public set doc(doc: TextDocument) {
-    this._textDoc = doc;
-  }
-
-  public getDiagnostics(node: YAMLNode): Diagnostic[] {
+  public getDiagnostics(node: YAMLNode, doc: TextDocument): Diagnostic[] {
     this._nodeX = node;
+    this._textDoc = doc;
+
     return this.validate(node);
   }
 
@@ -231,10 +232,18 @@ export class FormatValidation {
   ): Diagnostic[] {
     if (!schema) {
       return this.validate(node.value);
-    } else if (schema.value) {
-      return this.validate(node.value, schema.value);
     } else {
-      return [];
+      let result: Diagnostic[] = [];
+
+      if (schema.value) {
+        result = result.concat(this.validate(node.value, schema.value));
+      }
+
+      if (schema.key === '$') {
+        result = result.concat(this.validateScalar(node.key));
+      }
+
+      return result;
     }
   }
 
@@ -256,11 +265,13 @@ export class FormatValidation {
           return;
         } else if (item.kind === Kind.MAP) {
           (item as YamlMap).mappings.forEach(mapping => {
-            const schemaItem = schema.items.get(mapping.key.value);
-
-            if (schemaItem) {
-              result = result.concat(this.validate(mapping, schemaItem));
-            }
+            schema.items.forEach(schemaItem => {
+              if (schemaItem.key === mapping.key.value) {
+                result = result.concat(this.validate(mapping, schemaItem));
+              } else if (schemaItem.key === '$') {
+                result = result.concat(this.validate(mapping, schemaItem));
+              }
+            });
           });
         }
       });

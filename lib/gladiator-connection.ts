@@ -52,8 +52,6 @@ export class GladiatorConnection extends LanguageClientConnection {
   public isRelated(pathToCheck: string): boolean {
     let result = false;
 
-    console.log(this._docs.keys());
-
     const uriToCheck = Convert.pathToUri(pathToCheck);
 
     for (const uri of this._docs.keys()) {
@@ -169,15 +167,16 @@ export class GladiatorConnection extends LanguageClientConnection {
       const paramsPath = Convert.uriToPath(params.uri);
 
       if (this._format && paramsPath.match(CONFIG_FILE_REGEX)) {
-        const formatDoc = getOpenYAMLDocuments().get(
-          Convert.pathToUri(params.uri),
-        );
+        const formatDoc = getOpenYAMLDocuments().get(paramsPath);
 
         if (formatDoc) {
           this._format.subPath = dirname(paramsPath);
 
           params.diagnostics = params.diagnostics.concat(
-            this._format.getDiagnostics(safeLoad(formatDoc.getText())),
+            this._format.getDiagnostics(
+              safeLoad(formatDoc.getText()),
+              formatDoc,
+            ),
           );
         }
 
