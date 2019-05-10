@@ -229,7 +229,7 @@ export class SuperConnection extends LanguageClientConnection {
       return new Promise(resolve => {
         const outline = new SingleFileOutline(doc);
         // const outline = new ScoreOutline(doc);
-        const res = outline.parseFile();
+        const res = outline.getOutline();
         resolve(res);
       });
     }

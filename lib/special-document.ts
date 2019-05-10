@@ -66,6 +66,10 @@ export class SpecialDocument {
     }
   }
 
+  public get content(): string {
+    return this._content;
+  }
+
   public get relatedUris(): string[] {
     return this._relatedUris;
   }

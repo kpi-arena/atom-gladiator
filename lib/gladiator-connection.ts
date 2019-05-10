@@ -22,7 +22,7 @@ import {
 import { safeLoad } from 'yaml-ast-parser';
 import { FormatValidation } from './format-schema';
 import { CONFIG_FILE_REGEX, getGladiatorFormat } from './gladiator-cli-adapter';
-import { SingleFileOutline } from './outline';
+import { ScoreOutline, SingleFileOutline } from './outline';
 import { SpecialDocument } from './special-document';
 import { getOpenYAMLDocuments } from './util';
 
@@ -30,6 +30,7 @@ export class GladiatorConnection extends LanguageClientConnection {
   private _docs: Map<string, SpecialDocument> = new Map();
   private _versions: Map<SpecialDocument, number> = new Map();
   private _format: FormatValidation | null = null;
+  private _scoreOutlineUris: string[] = [];
 
   constructor(rpc: MessageConnection, logger?: Logger) {
     super(rpc, logger);
@@ -43,9 +44,14 @@ export class GladiatorConnection extends LanguageClientConnection {
       });
   }
 
-  public addSpecialDoc(doc: SpecialDocument) {
-    doc.relatedUris.forEach(relatedUri => this._docs.set(relatedUri, doc));
+  public addSpecialDoc(doc: SpecialDocument, hasScore: boolean) {
+    doc.relatedUris.forEach(relatedUri => {
+      this._docs.set(relatedUri, doc);
+      this._scoreOutlineUris.push(relatedUri);
+    });
+
     this._versions.set(doc, 0);
+
     super.didOpenTextDocument(doc.getDidOpen());
   }
 
@@ -75,6 +81,7 @@ export class GladiatorConnection extends LanguageClientConnection {
     });
 
     this._docs = new Map();
+    this._scoreOutlineUris = [];
     this._versions = new Map();
   }
 
@@ -227,13 +234,25 @@ export class GladiatorConnection extends LanguageClientConnection {
     params: DocumentSymbolParams,
     cancellationToken?: CancellationToken,
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    const doc = getOpenYAMLDocuments().get(params.textDocument.uri);
+    if (
+      this._docs.has(params.textDocument.uri) &&
+      this._scoreOutlineUris.indexOf(params.textDocument.uri) >= 0
+    ) {
+      return new Promise(resolve => {
+        resolve(
+          new ScoreOutline(this._docs.get(
+            params.textDocument.uri,
+          ) as SpecialDocument).getOutline(),
+        );
+      });
+    }
+
+    const doc = getOpenYAMLDocuments().get(
+      Convert.uriToPath(params.textDocument.uri),
+    );
     if (doc) {
       return new Promise(resolve => {
-        const outline = new SingleFileOutline(doc);
-        // const outline = new ScoreOutline(doc);
-        const res = outline.parseFile();
-        resolve(res);
+        resolve(new SingleFileOutline(doc).getOutline());
       });
     } else {
       return super.documentSymbol(params, cancellationToken);

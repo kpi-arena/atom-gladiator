@@ -264,6 +264,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
           new SpecialDocument(
             path.join(path.dirname(configPath), values.problemsetPath),
           ),
+          true,
         );
       }
 
@@ -272,6 +273,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
           new SpecialDocument(
             path.join(path.dirname(configPath), values.variantsPath),
           ),
+          false,
         );
       }
     }

@@ -15,12 +15,12 @@ import {
   YAMLScalar,
   YAMLSequence,
 } from 'yaml-ast-parser';
-import { SuperDocument } from './document-manager';
+import { SpecialDocument } from './special-document';
 
 export class SingleFileOutline {
   constructor(private _doc: TextDocument) {}
 
-  public parseFile(): DocumentSymbol[] {
+  public getOutline(): DocumentSymbol[] {
     return this.parseYamlNode(load(this._doc.getText()));
   }
 
@@ -278,19 +278,20 @@ interface ITask {
 export class ScoreOutline {
   private _taskTypes: string[] = ['suite', 'system', 'test:exec', 'test:ws'];
   private _taskTypeSymbol: SymbolKind[] = [
-    SymbolKind.Array,
-    SymbolKind.Object,
-    SymbolKind.Variable,
-    SymbolKind.Module,
+    SymbolKind.Constructor,
+    SymbolKind.Field,
+    SymbolKind.Property,
+    SymbolKind.Constant,
   ];
 
-  constructor(private _superDoc: SuperDocument) {}
+  constructor(private _superDoc: SpecialDocument) {}
 
-  public parseFile(): DocumentSymbol[] {
+  public getOutline(): DocumentSymbol[] {
     const tasks = this.getTasksArray(load(this._superDoc.content));
+    console.log(tasks);
 
     if (tasks) {
-      return this.parseSuite(tasks)[0];
+      return this.parseTasks(tasks)[0];
     }
 
     return [];
@@ -301,7 +302,12 @@ export class ScoreOutline {
 
     if (node.kind === Kind.MAP) {
       (node as YamlMap).mappings.forEach(mapping => {
-        if (mapping.key.value === 'tasks' && mapping.value.kind === Kind.SEQ) {
+        if (!mapping.value) {
+          return;
+        } else if (
+          mapping.key.value === 'tasks' &&
+          mapping.value.kind === Kind.SEQ
+        ) {
           result = mapping.value as YAMLSequence;
         } else if (mapping.value.kind === Kind.ANCHOR_REF) {
           const tmpResult = this.getTasksArray(mapping.value.value);
@@ -316,7 +322,24 @@ export class ScoreOutline {
     return result;
   }
 
-  private parseTask(node: YAMLNode): [DocumentSymbol | null, number] {
+  private parseTasks(node: YAMLSequence): [DocumentSymbol[], number] {
+    const result: DocumentSymbol[] = [];
+
+    let score: number = 0;
+
+    node.items.forEach(item => {
+      const subResult = this.parseGenericTask(item);
+
+      if (subResult[0]) {
+        result.push(subResult[0]);
+        score += subResult[1];
+      }
+    });
+
+    return [result, score];
+  }
+
+  private parseGenericTask(node: YAMLNode): [DocumentSymbol | null, number] {
     if (node.kind === Kind.MAP) {
       let result: ITask = {
         type: -1,
@@ -326,29 +349,6 @@ export class ScoreOutline {
       };
 
       result = this.parseTaskMap(node, result);
-
-      // let type: number = -1;
-      // let title: string | null = null;
-      // let score: number = 0;
-      // let replicas: number = 0;
-
-      // (node as YamlMap).mappings.forEach(mapping => {
-      //   switch (mapping.key.value) {
-      //     case 'type':
-      //       type = this.getType(mapping.value);
-      //       return;
-      //     case 'title':
-      //       title = this.getString(mapping.value);
-      //       return;
-      //     case 'score':
-      //       score = this.getNumber(mapping.value);
-      //       return;
-      //     case 'replicas':
-      //       replicas = this.getNumber(mapping.value);
-      //       return;
-      //     case '':
-      //   }
-      // });
 
       if (result.type < 0 || !result.title) {
         return [null, 0];
@@ -363,7 +363,7 @@ export class ScoreOutline {
       const tasks = this.getTasksArray(node);
 
       if (result.type === 0 && tasks) {
-        const suite = this.parseSuite(tasks);
+        const suite = this.parseTasks(tasks);
         children = suite[0];
         result.score += suite[1];
       }
@@ -385,8 +385,6 @@ export class ScoreOutline {
   }
 
   private parseTaskMap(node: YAMLNode, result: ITask) {
-    // const result: ITask = {};
-
     if (node.kind === Kind.MAP) {
       (node as YamlMap).mappings.forEach(mapping => {
         switch (mapping.key.value) {
@@ -410,23 +408,6 @@ export class ScoreOutline {
     }
 
     return result;
-  }
-
-  private parseSuite(node: YAMLSequence): [DocumentSymbol[], number] {
-    const result: DocumentSymbol[] = [];
-
-    let score: number = 0;
-
-    node.items.forEach(item => {
-      const subResult = this.parseTask(item);
-
-      if (subResult[0]) {
-        result.push(subResult[0]);
-        score += subResult[1];
-      }
-    });
-
-    return [result, score];
   }
 
   private getType(node: YAMLNode): number {
