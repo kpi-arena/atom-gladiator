@@ -52,12 +52,18 @@ export function generateFilesToDir(view: CommandPalleteView): void {
   );
 }
 
-export function getConfigFilePath(): Promise<string> {
+export function getConfigFilePath(silent: boolean): Promise<string> {
   const scriptPath = getScriptPath();
 
   if (!scriptPath) {
-    atom.notifications.addError(`Can't determine where to look for file`, {
-      description: `Please open a file (or make an editor active).`,
+    return new Promise<string>((resolve, reject) => {
+      if (!silent) {
+        atom.notifications.addError(`Can't determine where to look for file`, {
+          description: `Please open a file (or make an editor active).`,
+        });
+      }
+
+      reject();
     });
   }
 
@@ -86,8 +92,10 @@ export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
   );
 }
 
-export function problemsetPush(view: CommandPalleteView) {
-  const scriptPath = getScriptPath();
+export function problemsetPush(view: CommandPalleteView, scriptPath?: string) {
+  if (!scriptPath) {
+    scriptPath = getScriptPath();
+  }
 
   if (!scriptPath) {
     return;

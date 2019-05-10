@@ -49,6 +49,22 @@ export class GladiatorConnection extends LanguageClientConnection {
     super.didOpenTextDocument(doc.getDidOpen());
   }
 
+  public isRelated(pathToCheck: string): boolean {
+    let result = false;
+
+    console.log(this._docs.keys());
+
+    const uriToCheck = Convert.pathToUri(pathToCheck);
+
+    for (const uri of this._docs.keys()) {
+      if (uri === uriToCheck) {
+        result = true;
+      }
+    }
+
+    return result;
+  }
+
   public set formatSubPath(subPath: string | null) {
     if (subPath && this._format) {
       (this._format as FormatValidation).subPath = subPath;
