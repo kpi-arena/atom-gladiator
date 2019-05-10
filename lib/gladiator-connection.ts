@@ -30,7 +30,7 @@ export class GladiatorConnection extends LanguageClientConnection {
   private _docs: Map<string, SpecialDocument> = new Map();
   private _versions: Map<SpecialDocument, number> = new Map();
   private _format: FormatValidation | null = null;
-  private _scoreOutlineUris: string[] = [];
+  private _scorePath: string = '';
 
   constructor(rpc: MessageConnection, logger?: Logger) {
     super(rpc, logger);
@@ -47,8 +47,11 @@ export class GladiatorConnection extends LanguageClientConnection {
   public addSpecialDoc(doc: SpecialDocument, hasScore: boolean) {
     doc.relatedUris.forEach(relatedUri => {
       this._docs.set(relatedUri, doc);
-      this._scoreOutlineUris.push(relatedUri);
     });
+
+    if (hasScore) {
+      this._scorePath = doc.rootPath;
+    }
 
     this._versions.set(doc, 0);
 
@@ -81,7 +84,6 @@ export class GladiatorConnection extends LanguageClientConnection {
     });
 
     this._docs = new Map();
-    this._scoreOutlineUris = [];
     this._versions = new Map();
   }
 
@@ -95,6 +97,7 @@ export class GladiatorConnection extends LanguageClientConnection {
     if (this._docs.has(params.textDocument.uri)) {
       const doc = this._docs.get(params.textDocument.uri) as SpecialDocument;
 
+      /* Calculating new version number and deleting the previous doc. */
       const version = (this._versions.get(doc) as number) + 1;
       this._versions.delete(doc);
 
@@ -105,6 +108,7 @@ export class GladiatorConnection extends LanguageClientConnection {
       }
 
       const newDoc = new SpecialDocument(doc.rootPath);
+
       newDoc.relatedUris.forEach(relatedUri =>
         this._docs.set(relatedUri, newDoc),
       );
@@ -234,22 +238,18 @@ export class GladiatorConnection extends LanguageClientConnection {
     params: DocumentSymbolParams,
     cancellationToken?: CancellationToken,
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    if (
-      this._docs.has(params.textDocument.uri) &&
-      this._scoreOutlineUris.indexOf(params.textDocument.uri) >= 0
-    ) {
+    const specDoc = this._docs.get(params.textDocument.uri);
+
+    if (specDoc && specDoc.rootPath === this._scorePath) {
       return new Promise(resolve => {
-        resolve(
-          new ScoreOutline(this._docs.get(
-            params.textDocument.uri,
-          ) as SpecialDocument).getOutline(),
-        );
+        resolve(new ScoreOutline(specDoc).getOutline());
       });
     }
 
     const doc = getOpenYAMLDocuments().get(
       Convert.uriToPath(params.textDocument.uri),
     );
+
     if (doc) {
       return new Promise(resolve => {
         resolve(new SingleFileOutline(doc).getOutline());
