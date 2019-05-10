@@ -270,6 +270,6 @@ export class GladiatorStatusView {
   }
 
   private attach() {
-    this._statusBar.addRightTile({ priority: 170, item: this._element });
+    this._statusBar.addRightTile({ priority: 200, item: this._element });
   }
 }

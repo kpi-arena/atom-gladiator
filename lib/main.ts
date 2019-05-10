@@ -15,18 +15,19 @@ import {
   getConfigValues,
   IConfigValues,
 } from './gladiator-config';
+import { GladiatorConnection } from './gladiator-connection';
 import { getDefaultSettings } from './server-settings';
-import { GladiatorConnection } from './super-connection';
+import { SpecialDocument } from './special-document';
 import CommandPalleteView, { GladiatorStatusView } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: LanguageClientConnection | null = null;
   private _settings = getDefaultSettings();
   private _configValues: Map<string, IConfigValues> = new Map();
+  private _configPath: string | null = null;
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
   private _statusView: GladiatorStatusView | null = null;
-  private ele = document.createElement('a');
 
   // @ts-ignore
   public activate(state: IClientState) {
@@ -53,11 +54,10 @@ export class GladiatorConfClient extends AutoLanguageClient {
           .getConfigFilePath()
           .then(newPath => {
             if (this._configValues.has(newPath)) {
-              this.sendSettings(this._configValues.get(
+              this.changeConfiguration(
+                this._configValues.get(newPath) as IConfigValues,
                 newPath,
-              ) as IConfigValues);
-
-              this.updateStatusBar(newPath);
+              );
             }
           })
           .catch(),
@@ -75,13 +75,24 @@ export class GladiatorConfClient extends AutoLanguageClient {
               default:
                 getConfigValues(event.path)
                   .then(values => {
-                    this.sendSettings(values);
                     this._configValues.set(event.path, values);
-                    this.updateStatusBar(event.path);
+
+                    this.changeConfiguration(values, event.path);
                   })
                   .catch(() => {
                     this._configValues.delete(event.path);
                   });
+                cli
+                  .getConfigFilePath()
+                  .then(newPath => {
+                    if (newPath !== this._configPath) {
+                      this.changeConfiguration(
+                        this._configValues.get(newPath) as IConfigValues,
+                        newPath,
+                      );
+                    }
+                  })
+                  .catch();
             }
           }
         }
@@ -93,14 +104,18 @@ export class GladiatorConfClient extends AutoLanguageClient {
             .getConfigFilePath()
             .then(newPath => {
               if (this._configValues.has(newPath)) {
-                this.sendSettings(this._configValues.get(
+                this.changeConfiguration(
+                  this._configValues.get(newPath) as IConfigValues,
                   newPath,
-                ) as IConfigValues);
+                );
               } else {
                 getConfigValues(newPath)
                   .then(values => {
                     this._configValues.set(newPath, values);
-                    this.sendSettings(values);
+                    this.changeConfiguration(
+                      this._configValues.get(newPath) as IConfigValues,
+                      newPath,
+                    );
                   })
                   .catch();
               }
@@ -168,21 +183,20 @@ export class GladiatorConfClient extends AutoLanguageClient {
       .getConfigFilePath()
       .then(configPath => {
         if (this._configValues.has(configPath)) {
-          this.sendSettings(this._configValues.get(
+          this.changeConfiguration(
+            this._configValues.get(configPath) as IConfigValues,
             configPath,
-          ) as IConfigValues);
+          );
         } else {
           getConfigValues(configPath)
             .then(values => {
               this._configValues.set(configPath, values);
-              this.sendSettings(values);
+              this.changeConfiguration(values, configPath);
             })
-            .catch(() => this.sendSettings({}));
+            .catch(() => this.changeConfiguration({}, configPath));
         }
-
-        this.updateStatusBar(configPath);
       })
-      .catch(() => this.sendSettings({}));
+      .catch(() => this.changeConfiguration({}, null));
   }
 
   public getGrammarScopes(): string[] {
@@ -211,6 +225,37 @@ export class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
+  private changeConfiguration(values: IConfigValues, newPath: string | null) {
+    if (!newPath) {
+      this.sendSettings(values);
+
+      (this._connection as GladiatorConnection).deleteSpecialDocs();
+
+      if (this._statusView) {
+        this._statusView.update(false);
+      }
+    } else if (
+      (this._configPath && this._configPath !== newPath) ||
+      !this._configPath
+    ) {
+      this.sendSettings(values);
+      if (this._statusView) {
+        this.setFiles(values, newPath);
+
+        this._statusView.update(true, newPath);
+      }
+    } else if (
+      this._configPath === newPath &&
+      (this._configValues.get(this._configPath) as IConfigValues) !== values
+    ) {
+      this.sendSettings(values);
+
+      this.setFiles(values, newPath);
+    }
+
+    this._configPath = newPath;
+  }
+
   private sendSettings(values: IConfigValues) {
     this._settings.settings.yaml.schemas = {};
 
@@ -228,9 +273,31 @@ export class GladiatorConfClient extends AutoLanguageClient {
       this._settings.settings.yaml.schemas[values.variantSchema] =
         values.variantsPath;
     }
+  }
 
+  private setFiles(values: IConfigValues, configPath: string) {
     if (this._connection !== null) {
       this._connection.didChangeConfiguration(this._settings);
+    }
+
+    if (this._connection) {
+      (this._connection as GladiatorConnection).deleteSpecialDocs();
+
+      if (values.problemsetPath) {
+        (this._connection as GladiatorConnection).addSpecialDoc(
+          new SpecialDocument(
+            path.join(path.dirname(configPath), values.problemsetPath),
+          ),
+        );
+      }
+
+      if (values.variantsPath) {
+        (this._connection as GladiatorConnection).addSpecialDoc(
+          new SpecialDocument(
+            path.join(path.dirname(configPath), values.variantsPath),
+          ),
+        );
+      }
     }
   }
 

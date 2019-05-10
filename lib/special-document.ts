@@ -46,19 +46,27 @@ export interface ILinesRelation {
 export class SpecialDocument {
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include ((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
 
-  private _relatedUris: Map<string, SpecialDocument> = new Map();
+  private _relatedUris: string[] = [];
   private _newToOld: ILinesRelation[] = [];
   private _oldToNew: Map<number, ILinesRelation[]> = new Map();
   private _includeErrors: IncludeError[] = [];
   private _content: string;
 
   constructor(private _rootPath: string) {
-    const editorDocs = getOpenYAMLDocuments();
-
-    this._content = this.buildDocument('', _rootPath, '', editorDocs, []);
+    try {
+      this._content = this.buildDocument(
+        '',
+        _rootPath,
+        '',
+        getOpenYAMLDocuments(),
+        [],
+      );
+    } catch (err) {
+      this._content = '';
+    }
   }
 
-  public get relatedPaths(): Map<string, SpecialDocument> {
+  public get relatedUris(): string[] {
     return this._relatedUris;
   }
 
@@ -192,13 +200,13 @@ export class SpecialDocument {
     /* Initialize Map for each related subdocument with it's relatedUri as a
     key. Skipping this steps results in Diagnostics not clearing from editor
     if each Diagnostic is fixed by user. */
-    for (const relatedUri of this._relatedUris.keys()) {
+    this._relatedUris.forEach(relatedUri => {
       result.set(relatedUri, {
         uri: relatedUri,
         version: params.version,
         diagnostics: [],
       });
-    }
+    });
 
     params.diagnostics.forEach(diagnose => {
       const startRelation = this._newToOld[diagnose.range.start.line];
@@ -288,6 +296,8 @@ export class SpecialDocument {
     editorDocs: Map<string, TextDocument>,
     pathStack: string[],
   ): string {
+    this._relatedUris.push(Convert.pathToUri(docPath));
+
     const doc = getBasicTextDocument(docPath, editorDocs);
 
     if (!doc) {
@@ -295,13 +305,11 @@ export class SpecialDocument {
     }
 
     /* Checking if the file is already in stack, in case it is throw an error. */
-    if (pathStack.indexOf(docPath) > -1) {
+    if (pathStack.indexOf(docPath) >= 0) {
       throw new Error('i');
     }
 
     pathStack.push(docPath);
-
-    this._relatedUris.set(Convert.pathToUri(docPath), this);
 
     /* Using @ts-ignore to ignore the error, caused by accessing private method
     to obtain line offsets od the document. */
@@ -325,6 +333,8 @@ export class SpecialDocument {
           end: doc.positionAt(docOffsets[index + 1]),
         });
       }
+
+      newContent = newContent.concat(intendation, docLine);
 
       const newLineRelation = {
         newLine: this._newToOld.length,

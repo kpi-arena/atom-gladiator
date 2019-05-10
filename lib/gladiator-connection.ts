@@ -1,4 +1,5 @@
 import { Convert, LanguageClientConnection, Logger } from 'atom-languageclient';
+import { dirname } from 'path';
 import { MessageConnection } from 'vscode-jsonrpc';
 import {
   CancellationToken,
@@ -43,16 +44,18 @@ export class GladiatorConnection extends LanguageClientConnection {
   }
 
   public addSpecialDoc(doc: SpecialDocument) {
-    this._docs = doc.relatedPaths;
+    doc.relatedUris.forEach(relatedUri => this._docs.set(relatedUri, doc));
     this._versions.set(doc, 0);
     super.didOpenTextDocument(doc.getDidOpen());
   }
 
-  public set format(format: FormatValidation | null) {
-    this._format = format;
+  public set formatSubPath(subPath: string | null) {
+    if (subPath && this._format) {
+      (this._format as FormatValidation).subPath = subPath;
+    }
   }
 
-  public deteleSpecialDocs() {
+  public deleteSpecialDocs() {
     this._docs.forEach(doc => {
       super.didCloseTextDocument(doc.getDidClose());
     });
@@ -74,8 +77,18 @@ export class GladiatorConnection extends LanguageClientConnection {
       const version = (this._versions.get(doc) as number) + 1;
       this._versions.delete(doc);
 
+      for (const uri of this._docs.keys()) {
+        if ((this._docs.get(uri) as SpecialDocument) === doc) {
+          this._docs.delete(uri);
+        }
+      }
+
       const newDoc = new SpecialDocument(doc.rootPath);
-      this._docs = newDoc.relatedPaths;
+      newDoc.relatedUris.forEach(relatedUri =>
+        this._docs.set(relatedUri, newDoc),
+      );
+
+      this._versions.set(newDoc, version);
 
       super.didChangeTextDocument(newDoc.getDidChange(version));
     } else {
@@ -137,12 +150,16 @@ export class GladiatorConnection extends LanguageClientConnection {
     callback: (params: PublishDiagnosticsParams) => void,
   ): void {
     const newCallback = (params: PublishDiagnosticsParams) => {
-      if (this._format && params.uri.match(CONFIG_FILE_REGEX)) {
+      const paramsPath = Convert.uriToPath(params.uri);
+
+      if (this._format && paramsPath.match(CONFIG_FILE_REGEX)) {
         const formatDoc = getOpenYAMLDocuments().get(
           Convert.pathToUri(params.uri),
         );
 
         if (formatDoc) {
+          this._format.subPath = dirname(paramsPath);
+
           params.diagnostics = params.diagnostics.concat(
             this._format.getDiagnostics(safeLoad(formatDoc.getText())),
           );
@@ -195,18 +212,7 @@ export class GladiatorConnection extends LanguageClientConnection {
     params: DocumentSymbolParams,
     cancellationToken?: CancellationToken,
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
-    const doc = getOpenYAMLDocuments().get(
-      Convert.pathToUri(params.textDocument.uri),
-    );
-
-    if (doc) {
-      return new Promise(resolve => {
-        const outline = new SingleFileOutline(doc);
-        // const outline = new ScoreOutline(doc);
-        const res = outline.parseFile();
-        resolve(res);
-      });
-    }
+    const doc = getOpenYAMLDocuments().get(params.textDocument.uri);
     if (doc) {
       return new Promise(resolve => {
         const outline = new SingleFileOutline(doc);
