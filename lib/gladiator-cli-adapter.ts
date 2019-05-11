@@ -1,6 +1,5 @@
 import { BufferedProcess, ProcessOptions } from 'atom';
 import * as path from 'path';
-import { getAllConfigs } from './gladiator-config';
 import CommandPalleteView from './ui';
 import { getProjectOrHomePath } from './util';
 
@@ -240,12 +239,6 @@ function getScriptPath(): string | undefined {
 
   if (editor && editor.getPath()) {
     return path.dirname(editor.getPath() as string);
-  } else {
-    getAllConfigs().then(configPaths => {
-      if (configPaths.length === 1) {
-        return path.dirname(configPaths[0]);
-      }
-    });
   }
 
   return undefined;

@@ -1,19 +1,10 @@
 import { CompositeDisposable, TextEditor } from 'atom';
-import {
-  ActiveServer,
-  AutoLanguageClient,
-  ConnectionType,
-  LanguageServerProcess,
-} from 'atom-languageclient';
+import { ActiveServer, AutoLanguageClient, ConnectionType, LanguageServerProcess } from 'atom-languageclient';
 import { existsSync } from 'fs';
 import * as path from 'path';
 import { IClientState } from './client-state';
 import * as cli from './gladiator-cli-adapter';
-import {
-  getConfigSchema,
-  getConfigValues,
-  IConfigValues,
-} from './gladiator-config';
+import { getConfigSchema, getConfigValues, IConfigValues } from './gladiator-config';
 import { GladiatorConnection } from './gladiator-connection';
 import { getDefaultSettings } from './server-settings';
 import { SpecialDocument } from './special-document';
@@ -22,20 +13,11 @@ import CommandPalleteView, { GladiatorStatusView } from './ui';
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: GladiatorConnection | null = null;
   private _settings = getDefaultSettings();
-  // private _configValues: Map<string, IConfigValues> = new Map();
   private _configPath: string | null = null;
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
   private _statusView: GladiatorStatusView | null = null;
-  // public getDefinition(
-  //   editor: TextEditor,
-  //   point: Point,
-  // ): Promise<DefinitionQueryResult | null> {
-  //   return new Promise(resolve => {
-  //     console.log('lets gooo');
-  //     resolve(null);
-  //   });
-  // }
+  
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
@@ -43,32 +25,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (!cli.isInstalled()) {
       atom.notifications.addFatalError('gladiator-cli is not installed');
     }
-
-    /* Looking for all `.gladitor.yml` files in all projects and registering
-    their values to schemas. */
-    // getAllConfigs()
-    //   .then(paths => {
-    //     paths.forEach(configPath => {
-    //       getConfigValues(configPath)
-    //         .then(values => {
-    //           this._configValues.set(configPath, values);
-    //         })
-    //         .catch();
-    //     });
-    //   })
-    //   .then(() =>
-    //     cli
-    //       .getConfigFilePath(true)
-    //       .then(newPath => {
-    //         if (this._configValues.has(newPath)) {
-    //           this.changeConfiguration(
-    //             this._configValues.get(newPath) as IConfigValues,
-    //             newPath,
-    //           );
-    //         }
-    //       })
-    //       .catch(),
-    //   );
 
     this._subscriptions.add(
       /* Registering file watcher related to .gladiator.yml files. */

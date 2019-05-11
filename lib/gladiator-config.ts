@@ -1,16 +1,12 @@
 import { readFile } from 'fs';
-import { GlobSync } from 'glob';
-import { join } from 'path';
 import {
   Kind,
   safeLoad,
-  YAMLAnchorReference,
   YamlMap,
   YAMLMapping,
   YAMLNode,
 } from 'yaml-ast-parser';
 import {
-  CONFIG_FILE_NAME,
   getSchemaUri,
   PROBLEMSET_URL,
   VARIANTS_URL,
@@ -35,24 +31,6 @@ export function getConfigValues(path: string): Promise<IConfigValues> {
         resolve(readConfigValues(safeLoad(data)));
       }
     });
-  });
-}
-
-export function getAllConfigs(): Promise<string[]> {
-  return new Promise<string[]>(resolve => {
-    const result: string[] = [];
-
-    atom.project.getPaths().forEach(projectPath => {
-      const globResult = new GlobSync(`**/${CONFIG_FILE_NAME}`, {
-        cwd: projectPath,
-      });
-
-      globResult.found.forEach(match => {
-        result.push(join(projectPath, match));
-      });
-    });
-
-    resolve(result);
   });
 }
 
@@ -103,14 +81,6 @@ function getValueFromKey(node: YAMLNode, key: string): string | null {
   }
 
   return result;
-}
-
-function getAnchorValue(node: YAMLAnchorReference): YAMLNode {
-  if (node.value.kind !== Kind.ANCHOR_REF) {
-    return node.value;
-  } else {
-    return getAnchorValue(node.value as YAMLAnchorReference);
-  }
 }
 
 function getStringValue(node: YAMLNode): string | null {
