@@ -27,7 +27,15 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
   private _statusView: GladiatorStatusView | null = null;
-
+  // public getDefinition(
+  //   editor: TextEditor,
+  //   point: Point,
+  // ): Promise<DefinitionQueryResult | null> {
+  //   return new Promise(resolve => {
+  //     console.log('lets gooo');
+  //     resolve(null);
+  //   });
+  // }
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
@@ -304,8 +312,10 @@ export class GladiatorConfClient extends AutoLanguageClient {
       super.createRpcConnection(process),
       this.logger,
     );
+    // @ts-ignore
     this.preInitialization(connection);
     const initializeParams = this.getInitializeParams(projectPath, process);
+    // @ts-ignore
     const initialization = connection.initialize(initializeParams);
     this.reportBusyWhile(
       `${this.getServerName()} initializing for ${path.basename(projectPath)}`,
@@ -319,6 +329,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       capabilities: initializeResponse.capabilities,
       disposable: new CompositeDisposable(),
     };
+    // @ts-ignore
     this.postInitialization(newServer);
     connection.initialized();
     connection.on('close', () => {
@@ -366,6 +377,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     // @ts-ignore
     super.startExclusiveAdapters(newServer);
+    // @ts-ignore
     return newServer;
   };
 }

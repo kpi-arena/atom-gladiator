@@ -6,6 +6,7 @@ import {
   DidCloseTextDocumentParams,
   DidOpenTextDocumentParams,
   DidSaveTextDocumentParams,
+  Location,
   Position,
   PublishDiagnosticsParams,
   Range,
@@ -244,8 +245,22 @@ export class SpecialDocument {
       }
     });
 
-    console.log(result);
     return result;
+  }
+
+  public getLocation(params: TextDocumentPositionParams): Location | null {
+    const realParams = this.getTextDocumentPositionParams(params);
+
+    if (this._includes.has(realParams.position.line)) {
+      return Location.create(
+        Convert.pathToUri(this._includes.get(
+          realParams.position.line,
+        ) as string),
+        Range.create(Position.create(0, 0), Position.create(0, 0)),
+      );
+    } else {
+      return null;
+    }
   }
 
   /**

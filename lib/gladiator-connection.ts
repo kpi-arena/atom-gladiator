@@ -13,6 +13,9 @@ import {
   DocumentSymbol,
   DocumentSymbolParams,
   Hover,
+  InitializeParams,
+  InitializeResult,
+  Location,
   PublishDiagnosticsParams,
   SymbolInformation,
   TextDocumentPositionParams,
@@ -86,6 +89,14 @@ export class GladiatorConnection extends LanguageClientConnection {
     this._docs = new Map();
     this._versions = new Map();
     this._scoreDocs = new Map();
+  }
+  // @ts-ignore
+  public initialize(params: InitializeParams): Promise<InitializeResult> {
+    // @ts-ignore
+    return super.initialize(params).then(result => {
+      result.capabilities.definitionProvider = true;
+      return result;
+    });
   }
 
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
@@ -267,6 +278,27 @@ export class GladiatorConnection extends LanguageClientConnection {
       });
     } else {
       return super.documentSymbol(params, cancellationToken);
+    }
+  }
+
+  public gotoDefinition(
+    params: TextDocumentPositionParams,
+  ): Promise<Location | Location[]> {
+    console.log('motorkooooo\n\n');
+    if (this._docs.has(params.textDocument.uri)) {
+      return new Promise<Location | Location[]>((resolve, reject) => {
+        const specLink = (this._docs.get(
+          params.textDocument.uri,
+        ) as SpecialDocument).getLocation(params);
+
+        if (!specLink) {
+          reject();
+        } else {
+          resolve(specLink);
+        }
+      });
+    } else {
+      return super.gotoDefinition(params);
     }
   }
 }
