@@ -17,7 +17,6 @@ export default class CommandPalleteView {
     this.message.classList.add('message');
 
     this.element = document.createElement('div');
-    this.element.classList.add('man');
     this.element.appendChild(this.getMiniEditorElement());
     this.element.appendChild(this.message);
 
