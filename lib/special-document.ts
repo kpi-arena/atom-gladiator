@@ -244,6 +244,7 @@ export class SpecialDocument {
       }
     });
 
+    console.log(result);
     return result;
   }
 
@@ -400,7 +401,7 @@ export class SpecialDocument {
                 ),
                 Position.create(index, docLine.length - 1),
               ),
-              docPath,
+              Convert.pathToUri(docPath),
               err.message ? 1 : 0,
             ),
           );
