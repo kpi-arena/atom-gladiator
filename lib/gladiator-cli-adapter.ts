@@ -58,9 +58,7 @@ export function getConfigFilePath(silent: boolean): Promise<string> {
   if (!scriptPath) {
     return new Promise<string>((resolve, reject) => {
       if (!silent) {
-        atom.notifications.addError(`Can't determine where to look for file`, {
-          description: `Please open a file (or make an editor active).`,
-        });
+        noScriptPathWarning();
       }
 
       reject();
@@ -79,6 +77,7 @@ export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
   }
 
   if (!scriptPath) {
+    noScriptPathWarning();
     return;
   }
 
@@ -98,6 +97,7 @@ export function problemsetPush(view: CommandPalleteView, scriptPath?: string) {
   }
 
   if (!scriptPath) {
+    noScriptPathWarning();
     return;
   }
 
@@ -130,28 +130,40 @@ export function problemsetPush(view: CommandPalleteView, scriptPath?: string) {
   );
 }
 
-export function dockerImagePack() {
-  const scriptPath = getScriptPath();
+export function dockerImagePack(scriptPath?: string) {
+  if (!scriptPath) {
+    scriptPath = getScriptPath();
+  }
 
   if (!scriptPath) {
+    noScriptPathWarning();
     return;
   }
 
   getProcessPromise(['docker-image', 'pack'], { scriptPath });
 }
 
-export function getGladiatorFormat() {
-  return getProcessPromise(['files', 'gladiator-format'], { silent: true });
-}
-
-export function dockerImageBuild() {
-  const scriptPath = getScriptPath();
+export function dockerImageBuild(scriptPath?: string) {
+  if (!scriptPath) {
+    scriptPath = getScriptPath();
+  }
 
   if (!scriptPath) {
+    noScriptPathWarning();
     return;
   }
 
   getProcessPromise(['docker-image', 'build'], { scriptPath });
+}
+
+export function getGladiatorFormat() {
+  return getProcessPromise(['files', 'gladiator-format'], { silent: true });
+}
+
+function noScriptPathWarning(): void {
+  atom.notifications.addError(`Can't determine where to look for file`, {
+    description: `Please open a file (or make an editor active).`,
+  });
 }
 
 interface IProcessOptions {

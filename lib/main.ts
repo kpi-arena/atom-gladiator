@@ -114,6 +114,26 @@ export class GladiatorConfClient extends AutoLanguageClient {
           }
         },
       }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:docker-image-pack': () => {
+          if (this._configPath) {
+            cli.dockerImagePack(path.dirname(this._configPath));
+          } else {
+            cli.dockerImagePack();
+          }
+        },
+      }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:docker-image-build': () => {
+          if (this._configPath) {
+            cli.dockerImageBuild(path.dirname(this._configPath));
+          } else {
+            cli.dockerImageBuild();
+          }
+        },
+      }),
     );
 
     atom.config.set('core.debugLSP', true);
