@@ -51,6 +51,7 @@ export class SpecialDocument {
   private _oldToNew: Map<number, ILinesRelation[]> = new Map();
   private _includeErrors: IncludeError[] = [];
   private _content: string;
+  private _includes: Map<number, string> = new Map();
 
   constructor(private _rootPath: string) {
     try {
@@ -76,6 +77,10 @@ export class SpecialDocument {
 
   public get rootPath(): string {
     return this._rootPath;
+  }
+
+  public get includes(): Map<number, string> {
+    return this._includes;
   }
 
   /**
@@ -383,6 +388,7 @@ export class SpecialDocument {
             editorDocs,
             pathStack,
           );
+          this._includes.set(index, subDocPath);
         } catch (err) {
           this._includeErrors.push(
             new IncludeError(

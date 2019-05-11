@@ -30,7 +30,7 @@ export class GladiatorConnection extends LanguageClientConnection {
   private _docs: Map<string, SpecialDocument> = new Map();
   private _versions: Map<SpecialDocument, number> = new Map();
   private _format: FormatValidation | null = null;
-  private _scorePath: string = '';
+  private _scoreDocs: Map<string, ScoreOutline | null> = new Map();
 
   constructor(rpc: MessageConnection, logger?: Logger) {
     super(rpc, logger);
@@ -50,7 +50,7 @@ export class GladiatorConnection extends LanguageClientConnection {
     });
 
     if (hasScore) {
-      this._scorePath = doc.rootPath;
+      this._scoreDocs.set(doc.rootPath, null);
     }
 
     this._versions.set(doc, 0);
@@ -85,6 +85,7 @@ export class GladiatorConnection extends LanguageClientConnection {
 
     this._docs = new Map();
     this._versions = new Map();
+    this._scoreDocs = new Map();
   }
 
   public didOpenTextDocument(params: DidOpenTextDocumentParams): void {
@@ -114,6 +115,10 @@ export class GladiatorConnection extends LanguageClientConnection {
       );
 
       this._versions.set(newDoc, version);
+
+      if (this._scoreDocs.has(doc.rootPath)) {
+        this._scoreDocs.set(doc.rootPath, null);
+      }
 
       super.didChangeTextDocument(newDoc.getDidChange(version));
     } else {
@@ -240,9 +245,15 @@ export class GladiatorConnection extends LanguageClientConnection {
   ): Promise<SymbolInformation[] | DocumentSymbol[]> {
     const specDoc = this._docs.get(params.textDocument.uri);
 
-    if (specDoc && specDoc.rootPath === this._scorePath) {
+    if (specDoc && this._scoreDocs.has(specDoc.rootPath)) {
       return new Promise(resolve => {
-        resolve(new ScoreOutline(specDoc).getOutline());
+        let score = this._scoreDocs.get(specDoc.rootPath);
+
+        if (!score) {
+          score = new ScoreOutline(specDoc);
+          this._scoreDocs.set(specDoc.rootPath, score);
+        }
+        resolve(score.getOutline(params.textDocument.uri));
       });
     }
 

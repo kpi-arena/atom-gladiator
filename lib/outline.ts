@@ -278,13 +278,19 @@ interface ITask {
 }
 
 export class ScoreOutline {
-  private _taskTypes: string[] = ['suite', 'system', 'test:exec', 'test:ws'];
-  private _taskTypeSymbol: SymbolKind[] = [
+  private readonly _taskTypes: string[] = [
+    'suite',
+    'system',
+    'test:exec',
+    'test:ws',
+  ];
+  private readonly _taskTypeSymbol: SymbolKind[] = [
     SymbolKind.Constructor,
     SymbolKind.Field,
     SymbolKind.Property,
     SymbolKind.Constant,
   ];
+  private _result: Map<string, DocumentSymbol[]> = new Map();
 
   private _textDoc: TextDocument;
 
@@ -295,16 +301,38 @@ export class ScoreOutline {
       0,
       _superDoc.content,
     );
-  }
 
-  public getOutline(): DocumentSymbol[] {
+    this._superDoc.relatedUris.forEach(relatedUri => {
+      this._result.set(relatedUri, []);
+    });
+
     const tasks = this.getTasksArray(load(this._superDoc.content));
 
     if (tasks) {
-      return this.parseTasks(tasks, this._superDoc.rootPath)[0];
-    }
+      const totalTasks = this.parseTasks(
+        tasks,
+        Convert.pathToUri(this._superDoc.rootPath),
+      );
 
-    return [];
+      this._result.set(Convert.pathToUri(this._superDoc.rootPath), [
+        DocumentSymbol.create(
+          `TOTAL: ${totalTasks[1]}`,
+          undefined,
+          SymbolKind.Class,
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          Range.create(Position.create(0, 0), Position.create(0, 0)),
+          totalTasks[0],
+        ),
+      ]);
+    }
+  }
+
+  public getOutline(uri: string): DocumentSymbol[] {
+    if (this._result.has(uri)) {
+      return this._result.get(uri) as DocumentSymbol[];
+    } else {
+      return [];
+    }
   }
 
   private getTasksArray(node: YAMLNode): YAMLSequence | null {
@@ -334,14 +362,14 @@ export class ScoreOutline {
 
   private parseTasks(
     node: YAMLSequence,
-    currentUri: string,
+    previousUri: string,
   ): [DocumentSymbol[], number] {
     const result: DocumentSymbol[] = [];
 
     let score: number = 0;
 
     node.items.forEach(item => {
-      const subResult = this.parseGenericTask(item, currentUri);
+      const subResult = this.parseGenericTask(item, previousUri);
 
       if (subResult[0]) {
         result.push(subResult[0]);
@@ -354,7 +382,7 @@ export class ScoreOutline {
 
   private parseGenericTask(
     node: YAMLNode,
-    currentUri: string,
+    previousUri: string,
   ): [DocumentSymbol | null, number] {
     if (node.kind === Kind.MAP) {
       let result: ITask = {
@@ -374,34 +402,69 @@ export class ScoreOutline {
         result.score = result.score * result.replicas;
       }
 
+      const currentUri = this._superDoc.getOriginUri(
+        this._textDoc.positionAt(node.startPosition).line,
+      );
+
+      const range = this._superDoc.transformRange(
+        Range.create(
+          this._textDoc.positionAt(node.startPosition),
+          this._textDoc.positionAt(node.endPosition),
+        ),
+      );
+
       let children: DocumentSymbol[] = [];
 
       const tasks = this.getTasksArray(node);
 
       if (result.type === 0 && tasks) {
-        const suite = this.parseTasks(tasks, currentUri);
+        const suite = this.parseTasks(tasks, previousUri);
         children = suite[0];
         result.score += suite[1];
       }
 
-      if (
-        this._superDoc.getOriginUri(
-          this._textDoc.positionAt(node.startPosition).line,
-        ) !== currentUri
-      ) {
-      }
+      if (currentUri !== previousUri) {
+        const currentResult = this._result.get(currentUri) as DocumentSymbol[];
 
-      return [
-        DocumentSymbol.create(
-          `${result.title}(${result.score})`,
-          undefined,
-          this._taskTypeSymbol[result.type],
-          Range.create(Position.create(0, 0), Position.create(0, 0)),
-          Range.create(Position.create(0, 0), Position.create(0, 0)),
-          children,
-        ),
-        result.score,
-      ];
+        currentResult.push(
+          DocumentSymbol.create(
+            `${result.title}(${result.score})`,
+            undefined,
+            this._taskTypeSymbol[result.type],
+            range,
+            range,
+            children,
+          ),
+        );
+
+        const includeRange = this.getPreviousIncludeRange(
+          this._textDoc.positionAt(node.startPosition).line,
+        );
+
+        return [
+          DocumentSymbol.create(
+            `INCLUDE(${result.score})`,
+            undefined,
+            SymbolKind.String,
+            includeRange,
+            includeRange,
+            [],
+          ),
+          result.score,
+        ];
+      } else {
+        return [
+          DocumentSymbol.create(
+            `${result.title}(${result.score})`,
+            undefined,
+            this._taskTypeSymbol[result.type],
+            range,
+            range,
+            children,
+          ),
+          result.score,
+        ];
+      }
     }
 
     return [null, 0];
@@ -434,6 +497,9 @@ export class ScoreOutline {
   }
 
   private getType(node: YAMLNode): number {
+    if (!node) {
+      return -1;
+    }
     const typeString = this.getString(node);
 
     let result = -1;
@@ -452,7 +518,9 @@ export class ScoreOutline {
   }
 
   private getString(node: YAMLNode): string | null {
-    if (node.kind !== Kind.SCALAR) {
+    if (!node) {
+      return null;
+    } else if (node.kind !== Kind.SCALAR) {
       return null;
     }
 
@@ -468,16 +536,32 @@ export class ScoreOutline {
   }
 
   private getNumber(node: YAMLNode): number {
-    if (node.kind !== Kind.SCALAR) {
+    if (!node) {
+      return 0;
+    } else if (node.kind !== Kind.SCALAR) {
       return 0;
     }
 
-    if (node.value === null || node.valueObject === null) {
+    if (!node.value || !node.valueObject) {
       return 0;
     } else if (node.valueObject && typeof node.valueObject === 'number') {
       return node.valueObject;
     }
 
     return 0;
+  }
+
+  private getPreviousIncludeRange(refLine: number): Range {
+    let previous = 0;
+
+    for (const line of this._superDoc.includes.keys()) {
+      if (line < refLine) {
+        previous = line;
+      }
+    }
+
+    return this._superDoc.transformRange(
+      Range.create(Position.create(previous, 0), Position.create(previous, 99)),
+    );
   }
 }
