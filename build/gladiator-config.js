@@ -58,10 +58,13 @@ function getValueFromKey(node, key) {
     return result;
 }
 function getStringValue(node) {
-    if (node.kind !== yaml_ast_parser_1.Kind.SCALAR) {
+    if (!node) {
         return null;
     }
-    if (node.value === null || node.valueObject === null) {
+    else if (node.value === null || node.valueObject === null) {
+        return null;
+    }
+    else if (node.kind !== yaml_ast_parser_1.Kind.SCALAR) {
         return null;
     }
     else if (node.valueObject && typeof node.valueObject === 'number') {

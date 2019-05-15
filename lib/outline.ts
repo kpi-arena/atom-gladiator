@@ -1,4 +1,5 @@
 import { Convert } from 'atom-languageclient';
+import { dirname } from 'path';
 import {
   DocumentSymbol,
   Position,
@@ -271,8 +272,8 @@ export class SingleFileOutline {
 }
 
 interface ITask {
-  type: number;
-  title: string | null;
+  type?: number;
+  title?: string | null;
   score: number;
   replicas: number;
 }
@@ -291,20 +292,19 @@ export class ScoreOutline {
     SymbolKind.Constant,
   ];
   private _result: Map<string, DocumentSymbol[]> = new Map();
-
   private _textDoc: TextDocument;
 
   constructor(private _superDoc: SpecialDocument) {
+    this._superDoc.relatedUris.forEach(relatedUri => {
+      this._result.set(relatedUri, []);
+    });
+
     this._textDoc = TextDocument.create(
       Convert.pathToUri(this._superDoc.rootPath),
       LANGUAGE_ID,
       0,
       _superDoc.content,
     );
-
-    this._superDoc.relatedUris.forEach(relatedUri => {
-      this._result.set(relatedUri, []);
-    });
 
     const tasks = this.getTasksArray(load(this._superDoc.content));
 
@@ -386,19 +386,23 @@ export class ScoreOutline {
   ): [DocumentSymbol | null, number] {
     if (node.kind === Kind.MAP) {
       let result: ITask = {
-        type: -1,
-        title: null,
-        score: 0,
-        replicas: 0,
+        score: -1,
+        replicas: -1,
       };
 
       result = this.parseTaskMap(node, result);
+
+      if (result.type === undefined || !result.title) {
+        return [null, 0];
+      }
 
       if (result.type < 0 || !result.title) {
         return [null, 0];
       }
 
-      if (result.replicas > 0) {
+      if (result.score === -1) {
+        result.score = 0;
+      } else if (result.replicas > 0) {
         result.score = result.score * result.replicas;
       }
 
@@ -418,7 +422,7 @@ export class ScoreOutline {
       const tasks = this.getTasksArray(node);
 
       if (result.type === 0 && tasks) {
-        const suite = this.parseTasks(tasks, previousUri);
+        const suite = this.parseTasks(tasks, currentUri);
         children = suite[0];
         result.score += suite[1];
       }
@@ -437,17 +441,17 @@ export class ScoreOutline {
           ),
         );
 
-        const includeRange = this.getPreviousIncludeRange(
+        const include = this.getPreviousInclude(
           this._textDoc.positionAt(node.startPosition).line,
         );
 
         return [
           DocumentSymbol.create(
-            `INCLUDE(${result.score})`,
+            `${include[1]}(${result.score})`,
             undefined,
             SymbolKind.String,
-            includeRange,
-            includeRange,
+            include[0],
+            include[0],
             [],
           ),
           result.score,
@@ -475,16 +479,24 @@ export class ScoreOutline {
       (node as YamlMap).mappings.forEach(mapping => {
         switch (mapping.key.value) {
           case 'type':
-            result.type = this.getType(mapping.value);
+            if (result.type === undefined) {
+              result.type = this.getType(mapping.value);
+            }
             return;
           case 'title':
-            result.title = this.getString(mapping.value);
+            if (!result.title) {
+              result.title = this.getString(mapping.value);
+            }
             return;
           case 'score':
-            result.score = this.getNumber(mapping.value);
+            if (result.score < 0) {
+              result.score = this.getNumber(mapping.value);
+            }
             return;
           case 'replicas':
-            result.replicas = this.getNumber(mapping.value);
+            if (result.replicas < 0) {
+              result.replicas = this.getNumber(mapping.value);
+            }
             return;
           case '<<':
             result = this.parseTaskMap(mapping.value.value, result);
@@ -551,8 +563,8 @@ export class ScoreOutline {
     return 0;
   }
 
-  private getPreviousIncludeRange(refLine: number): Range {
-    let previous = 0;
+  private getPreviousInclude(refLine: number): [Range, string] {
+    let previous = -1;
 
     for (const line of this._superDoc.includes.keys()) {
       if (line < refLine) {
@@ -560,8 +572,47 @@ export class ScoreOutline {
       }
     }
 
-    return this._superDoc.transformRange(
-      Range.create(Position.create(previous, 0), Position.create(previous, 99)),
-    );
+    if (previous < 0) {
+      return [
+        this._superDoc.transformRange(
+          Range.create(Position.create(0, 0), Position.create(0, 99)),
+        ),
+        'INCLUDE',
+      ];
+    }
+
+    return [
+      this._superDoc.transformRange(
+        Range.create(
+          Position.create(previous, 0),
+          Position.create(previous, 99),
+        ),
+      ),
+      this.getRelativePath(
+        dirname(this._superDoc.rootPath),
+        this._superDoc.includes.get(previous) as string,
+      ),
+    ];
+  }
+
+  private getRelativePath(source: string, target: string) {
+    const sep = source.indexOf('/') !== -1 ? '/' : '\\';
+    const targetArr = target.split(sep);
+    const sourceArr = source.split(sep);
+    const filename = targetArr.pop();
+    const targetPath = targetArr.join(sep);
+    let relativePath = '';
+
+    while (targetPath.indexOf(sourceArr.join(sep)) === -1) {
+      sourceArr.pop();
+      relativePath += '..' + sep;
+    }
+
+    const relPathArr = targetArr.slice(sourceArr.length);
+    if (relPathArr.length > 0) {
+      relativePath += relPathArr.join(sep) + sep;
+    }
+
+    return relativePath + filename;
   }
 }

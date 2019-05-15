@@ -43,13 +43,13 @@ export default class CommandPalleteView {
       this.restoreFocus();
     }
 
-    this.callback(this.content);
     this.miniEditor.setText('');
     this.content = '';
   }
 
   public confirm() {
     this.content = this.miniEditor.getText();
+    this.callback(this.content);
     this.close();
   }
 

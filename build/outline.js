@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const atom_languageclient_1 = require("atom-languageclient");
+const path_1 = require("path");
 const vscode_languageserver_protocol_1 = require("vscode-languageserver-protocol");
 const yaml_ast_parser_1 = require("yaml-ast-parser");
 const util_1 = require("./util");
@@ -154,10 +155,10 @@ class ScoreOutline {
             vscode_languageserver_protocol_1.SymbolKind.Constant,
         ];
         this._result = new Map();
-        this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
         this._superDoc.relatedUris.forEach(relatedUri => {
             this._result.set(relatedUri, []);
         });
+        this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
         const tasks = this.getTasksArray(yaml_ast_parser_1.load(this._superDoc.content));
         if (tasks) {
             const totalTasks = this.parseTasks(tasks, atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath));
@@ -210,16 +211,20 @@ class ScoreOutline {
     parseGenericTask(node, previousUri) {
         if (node.kind === yaml_ast_parser_1.Kind.MAP) {
             let result = {
-                type: -1,
-                title: null,
-                score: 0,
-                replicas: 0,
+                score: -1,
+                replicas: -1,
             };
             result = this.parseTaskMap(node, result);
+            if (result.type === undefined || !result.title) {
+                return [null, 0];
+            }
             if (result.type < 0 || !result.title) {
                 return [null, 0];
             }
-            if (result.replicas > 0) {
+            if (result.score === -1) {
+                result.score = 0;
+            }
+            else if (result.replicas > 0) {
                 result.score = result.score * result.replicas;
             }
             const currentUri = this._superDoc.getOriginUri(this._textDoc.positionAt(node.startPosition).line);
@@ -227,16 +232,16 @@ class ScoreOutline {
             let children = [];
             const tasks = this.getTasksArray(node);
             if (result.type === 0 && tasks) {
-                const suite = this.parseTasks(tasks, previousUri);
+                const suite = this.parseTasks(tasks, currentUri);
                 children = suite[0];
                 result.score += suite[1];
             }
             if (currentUri !== previousUri) {
                 const currentResult = this._result.get(currentUri);
                 currentResult.push(vscode_languageserver_protocol_1.DocumentSymbol.create(`${result.title}(${result.score})`, undefined, this._taskTypeSymbol[result.type], range, range, children));
-                const includeRange = this.getPreviousIncludeRange(this._textDoc.positionAt(node.startPosition).line);
+                const include = this.getPreviousInclude(this._textDoc.positionAt(node.startPosition).line);
                 return [
-                    vscode_languageserver_protocol_1.DocumentSymbol.create(`INCLUDE(${result.score})`, undefined, vscode_languageserver_protocol_1.SymbolKind.String, includeRange, includeRange, []),
+                    vscode_languageserver_protocol_1.DocumentSymbol.create(`${include[1]}(${result.score})`, undefined, vscode_languageserver_protocol_1.SymbolKind.String, include[0], include[0], []),
                     result.score,
                 ];
             }
@@ -254,16 +259,24 @@ class ScoreOutline {
             node.mappings.forEach(mapping => {
                 switch (mapping.key.value) {
                     case 'type':
-                        result.type = this.getType(mapping.value);
+                        if (result.type === undefined) {
+                            result.type = this.getType(mapping.value);
+                        }
                         return;
                     case 'title':
-                        result.title = this.getString(mapping.value);
+                        if (!result.title) {
+                            result.title = this.getString(mapping.value);
+                        }
                         return;
                     case 'score':
-                        result.score = this.getNumber(mapping.value);
+                        if (result.score < 0) {
+                            result.score = this.getNumber(mapping.value);
+                        }
                         return;
                     case 'replicas':
-                        result.replicas = this.getNumber(mapping.value);
+                        if (result.replicas < 0) {
+                            result.replicas = this.getNumber(mapping.value);
+                        }
                         return;
                     case '<<':
                         result = this.parseTaskMap(mapping.value.value, result);
@@ -324,14 +337,40 @@ class ScoreOutline {
         }
         return 0;
     }
-    getPreviousIncludeRange(refLine) {
-        let previous = 0;
+    getPreviousInclude(refLine) {
+        let previous = -1;
         for (const line of this._superDoc.includes.keys()) {
             if (line < refLine) {
                 previous = line;
             }
         }
-        return this._superDoc.transformRange(vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(previous, 0), vscode_languageserver_protocol_1.Position.create(previous, 99)));
+        if (previous < 0) {
+            return [
+                this._superDoc.transformRange(vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 99))),
+                'INCLUDE',
+            ];
+        }
+        return [
+            this._superDoc.transformRange(vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(previous, 0), vscode_languageserver_protocol_1.Position.create(previous, 99))),
+            this.getRelativePath(path_1.dirname(this._superDoc.rootPath), this._superDoc.includes.get(previous)),
+        ];
+    }
+    getRelativePath(source, target) {
+        const sep = source.indexOf('/') !== -1 ? '/' : '\\';
+        const targetArr = target.split(sep);
+        const sourceArr = source.split(sep);
+        const filename = targetArr.pop();
+        const targetPath = targetArr.join(sep);
+        let relativePath = '';
+        while (targetPath.indexOf(sourceArr.join(sep)) === -1) {
+            sourceArr.pop();
+            relativePath += '..' + sep;
+        }
+        const relPathArr = targetArr.slice(sourceArr.length);
+        if (relPathArr.length > 0) {
+            relativePath += relPathArr.join(sep) + sep;
+        }
+        return relativePath + filename;
     }
 }
 exports.ScoreOutline = ScoreOutline;

@@ -84,11 +84,11 @@ function getValueFromKey(node: YAMLNode, key: string): string | null {
 }
 
 function getStringValue(node: YAMLNode): string | null {
-  if (node.kind !== Kind.SCALAR) {
+  if (!node) {
     return null;
-  }
-
-  if (node.value === null || node.valueObject === null) {
+  } else if (node.value === null || node.valueObject === null) {
+    return null;
+  } else if (node.kind !== Kind.SCALAR) {
     return null;
   } else if (node.valueObject && typeof node.valueObject === 'number') {
     return null;

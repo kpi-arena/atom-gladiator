@@ -1,10 +1,19 @@
 import { CompositeDisposable, TextEditor } from 'atom';
-import { ActiveServer, AutoLanguageClient, ConnectionType, LanguageServerProcess } from 'atom-languageclient';
+import {
+  ActiveServer,
+  AutoLanguageClient,
+  ConnectionType,
+  LanguageServerProcess,
+} from 'atom-languageclient';
 import { existsSync } from 'fs';
 import * as path from 'path';
 import { IClientState } from './client-state';
 import * as cli from './gladiator-cli-adapter';
-import { getConfigSchema, getConfigValues, IConfigValues } from './gladiator-config';
+import {
+  getConfigSchema,
+  getConfigValues,
+  IConfigValues,
+} from './gladiator-config';
 import { GladiatorConnection } from './gladiator-connection';
 import { getDefaultSettings } from './server-settings';
 import { SpecialDocument } from './special-document';
@@ -17,7 +26,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPalleteView();
   private _statusView: GladiatorStatusView | null = null;
-  
+
   // @ts-ignore
   public activate(state: IClientState) {
     super.activate();
@@ -92,7 +101,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       }),
     );
 
-    atom.config.set('core.debugLSP', true);
+    atom.config.set('core.debugLSP', false);
 
     if (state.serverSettings) {
       this._settings = state.serverSettings;
@@ -158,6 +167,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (!editorPath) {
       /* Nothing is open. */
       this.unsetValues();
+    } else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+      return;
     } else if (
       this._connection &&
       this._connection.isRelated(editorPath) &&

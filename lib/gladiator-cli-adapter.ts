@@ -85,7 +85,9 @@ export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
     '',
     'Enter the the name of the package without the .zip suffix.',
     (input: string) => {
-      getProcessPromise(['problemset', 'pack'], { scriptPath });
+      if (input.length > 0) {
+        getProcessPromise(['problemset', 'pack', input], { scriptPath });
+      }
     },
   );
 }

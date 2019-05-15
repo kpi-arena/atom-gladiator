@@ -144,7 +144,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
                 }
             },
         }));
-        atom.config.set('core.debugLSP', true);
+        atom.config.set('core.debugLSP', false);
         if (state.serverSettings) {
             this._settings = state.serverSettings;
         }
@@ -192,6 +192,9 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         if (!editorPath) {
             /* Nothing is open. */
             this.unsetValues();
+        }
+        else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+            return;
         }
         else if (this._connection &&
             this._connection.isRelated(editorPath) &&

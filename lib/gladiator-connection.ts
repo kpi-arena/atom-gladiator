@@ -284,7 +284,6 @@ export class GladiatorConnection extends LanguageClientConnection {
   public gotoDefinition(
     params: TextDocumentPositionParams,
   ): Promise<Location | Location[]> {
-    console.log('motorkooooo\n\n');
     if (this._docs.has(params.textDocument.uri)) {
       return new Promise<Location | Location[]>((resolve, reject) => {
         const specLink = (this._docs.get(

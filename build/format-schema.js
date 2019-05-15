@@ -38,8 +38,9 @@ class SchemaNode {
                 break;
             case yaml_ast_parser_1.Kind.SEQ:
                 node.items.forEach(item => {
-                    if (item.kind === yaml_ast_parser_1.Kind.SCALAR && item.value === '$') {
+                    if (item.kind === yaml_ast_parser_1.Kind.SCALAR && item.value[0] === '$') {
                         this._validateScalars = true;
+                        this._key = item.value;
                     }
                     else if (item.kind === yaml_ast_parser_1.Kind.MAP) {
                         item.mappings.forEach(mapping => {
@@ -60,7 +61,7 @@ class SchemaNode {
                 return false;
             }
             else {
-                if (this._key === '$') {
+                if (this._key[0] === '$') {
                     return true;
                 }
                 else if (node.key.value !== this._key) {
@@ -96,6 +97,7 @@ class FormatValidation {
         this._subpath = '';
         this._textDoc = vscode_languageserver_protocol_1.TextDocument.create('', '', 0, '');
         this._nodeX = null;
+        this._formatValues = new Map();
         if (this._schema.kind === yaml_ast_parser_1.Kind.MAP) {
             this._schema.mappings.forEach(mapping => {
                 this._routes.set(mapping.key.value, new SchemaNode(mapping.value));
@@ -143,8 +145,8 @@ class FormatValidation {
             case yaml_ast_parser_1.Kind.SEQ:
                 return this.validateSequence(node, schema);
             case yaml_ast_parser_1.Kind.SCALAR:
-                if (schema) {
-                    return this.validateScalar(node);
+                if (schema && schema.key && schema.key[0] === '$') {
+                    return this.validateScalar(node, schema.key);
                 }
             default:
                 return [];
@@ -179,8 +181,8 @@ class FormatValidation {
             if (schema.value) {
                 result = result.concat(this.validate(node.value, schema.value));
             }
-            if (schema.key === '$') {
-                result = result.concat(this.validateScalar(node.key));
+            if (schema.key && schema.key[0] === '$') {
+                result = result.concat(this.validateScalar(node.key, schema.key));
             }
             return result;
         }
@@ -194,8 +196,8 @@ class FormatValidation {
         }
         else {
             node.items.forEach(item => {
-                if (schema.validateScalars && item.kind === yaml_ast_parser_1.Kind.SCALAR) {
-                    result = result.concat(this.validateScalar(item));
+                if (schema.validateScalars && item.kind === yaml_ast_parser_1.Kind.SCALAR && schema.key) {
+                    result = result.concat(this.validateScalar(item, schema.key));
                     return;
                 }
                 else if (item.kind === yaml_ast_parser_1.Kind.MAP) {
@@ -204,7 +206,7 @@ class FormatValidation {
                             if (schemaItem.key === mapping.key.value) {
                                 result = result.concat(this.validate(mapping, schemaItem));
                             }
-                            else if (schemaItem.key === '$') {
+                            else if (schemaItem.key && schemaItem.key[0] === '$') {
                                 result = result.concat(this.validate(mapping, schemaItem));
                             }
                         });
@@ -214,17 +216,47 @@ class FormatValidation {
         }
         return result;
     }
-    validateScalar(node) {
+    validateScalar(node, format) {
         if (is_glob_1.default(node.value)) {
             return [];
         }
-        else if (fs_1.existsSync(path_1.join(this._subpath, node.value))) {
-            return [];
+        else if (format.length < 1) {
+            return fs_1.existsSync(path_1.join(this._subpath, node.value))
+                ? []
+                : [
+                    vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                ];
         }
         else {
-            return [
-                vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
-            ];
+            const formatVariables = format.split('/');
+            if (formatVariables.length === 1) {
+                this._formatValues.set(formatVariables[0], node.value);
+                return fs_1.existsSync(path_1.join(this._subpath, node.value))
+                    ? []
+                    : [
+                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                    ];
+            }
+            else {
+                const formatPaths = [];
+                formatVariables.forEach(variable => {
+                    if (this._formatValues.has(variable)) {
+                        formatPaths.push(this._formatValues.get(variable));
+                    }
+                });
+                if (formatPaths.length !== formatVariables.length) {
+                    return [
+                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                    ];
+                }
+                else {
+                    return fs_1.existsSync(path_1.join(this._subpath, ...formatPaths, node.value))
+                        ? []
+                        : [
+                            vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                        ];
+                }
+            }
         }
     }
     isRelatedCompletion(node, position) {
