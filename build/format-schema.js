@@ -250,7 +250,6 @@ class FormatValidation {
                     ];
                 }
                 else {
-                    console.log(path_1.join(this._subpath, ...formatPaths, node.value));
                     return fs_1.existsSync(path_1.join(this._subpath, ...formatPaths, node.value))
                         ? []
                         : [
@@ -258,17 +257,6 @@ class FormatValidation {
                         ];
                 }
             }
-        }
-        if (is_glob_1.default(node.value)) {
-            return [];
-        }
-        else if (fs_1.existsSync(path_1.join(this._subpath, node.value))) {
-            return [];
-        }
-        else {
-            return [
-                vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
-            ];
         }
     }
     isRelatedCompletion(node, position) {

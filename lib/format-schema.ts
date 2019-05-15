@@ -339,7 +339,6 @@ export class FormatValidation {
             ),
           ];
         } else {
-          console.log(join(this._subpath, ...formatPaths, node.value));
           return existsSync(join(this._subpath, ...formatPaths, node.value))
             ? []
             : [
@@ -354,22 +353,6 @@ export class FormatValidation {
               ];
         }
       }
-    }
-    if (isGlob(node.value)) {
-      return [];
-    } else if (existsSync(join(this._subpath, node.value))) {
-      return [];
-    } else {
-      return [
-        Diagnostic.create(
-          Range.create(
-            this._textDoc.positionAt(node.startPosition),
-            this._textDoc.positionAt(node.endPosition),
-          ),
-          'File not found.',
-          1,
-        ),
-      ];
     }
   }
 
