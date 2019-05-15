@@ -193,6 +193,9 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             /* Nothing is open. */
             this.unsetValues();
         }
+        else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+            return;
+        }
         else if (this._connection &&
             this._connection.isRelated(editorPath) &&
             this._configPath) {

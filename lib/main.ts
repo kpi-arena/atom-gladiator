@@ -167,6 +167,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (!editorPath) {
       /* Nothing is open. */
       this.unsetValues();
+    } else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+      return;
     } else if (
       this._connection &&
       this._connection.isRelated(editorPath) &&

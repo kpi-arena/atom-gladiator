@@ -1,6 +1,22 @@
 import { Convert } from 'atom-languageclient';
-import { DocumentSymbol, Position, Range, SymbolKind, TextDocument } from 'vscode-languageserver-protocol';
-import { Kind, load, YAMLAnchorReference, YamlMap, YAMLMapping, YAMLNode, YAMLScalar, YAMLSequence } from 'yaml-ast-parser';
+import { dirname } from 'path';
+import {
+  DocumentSymbol,
+  Position,
+  Range,
+  SymbolKind,
+  TextDocument,
+} from 'vscode-languageserver-protocol';
+import {
+  Kind,
+  load,
+  YAMLAnchorReference,
+  YamlMap,
+  YAMLMapping,
+  YAMLNode,
+  YAMLScalar,
+  YAMLSequence,
+} from 'yaml-ast-parser';
 import { SpecialDocument } from './special-document';
 import { LANGUAGE_ID } from './util';
 
@@ -425,17 +441,17 @@ export class ScoreOutline {
           ),
         );
 
-        const includeRange = this.getPreviousIncludeRange(
+        const include = this.getPreviousInclude(
           this._textDoc.positionAt(node.startPosition).line,
         );
 
         return [
           DocumentSymbol.create(
-            `INCLUDE(${result.score})`,
+            `${include[1]}(${result.score})`,
             undefined,
             SymbolKind.String,
-            includeRange,
-            includeRange,
+            include[0],
+            include[0],
             [],
           ),
           result.score,
@@ -547,8 +563,8 @@ export class ScoreOutline {
     return 0;
   }
 
-  private getPreviousIncludeRange(refLine: number): Range {
-    let previous = 0;
+  private getPreviousInclude(refLine: number): [Range, string] {
+    let previous = -1;
 
     for (const line of this._superDoc.includes.keys()) {
       if (line < refLine) {
@@ -556,8 +572,47 @@ export class ScoreOutline {
       }
     }
 
-    return this._superDoc.transformRange(
-      Range.create(Position.create(previous, 0), Position.create(previous, 99)),
-    );
+    if (previous < 0) {
+      return [
+        this._superDoc.transformRange(
+          Range.create(Position.create(0, 0), Position.create(0, 99)),
+        ),
+        'INCLUDE',
+      ];
+    }
+
+    return [
+      this._superDoc.transformRange(
+        Range.create(
+          Position.create(previous, 0),
+          Position.create(previous, 99),
+        ),
+      ),
+      this.getRelativePath(
+        dirname(this._superDoc.rootPath),
+        this._superDoc.includes.get(previous) as string,
+      ),
+    ];
+  }
+
+  private getRelativePath(source: string, target: string) {
+    const sep = source.indexOf('/') !== -1 ? '/' : '\\';
+    const targetArr = target.split(sep);
+    const sourceArr = source.split(sep);
+    const filename = targetArr.pop();
+    const targetPath = targetArr.join(sep);
+    let relativePath = '';
+
+    while (targetPath.indexOf(sourceArr.join(sep)) === -1) {
+      sourceArr.pop();
+      relativePath += '..' + sep;
+    }
+
+    const relPathArr = targetArr.slice(sourceArr.length);
+    if (relPathArr.length > 0) {
+      relativePath += relPathArr.join(sep) + sep;
+    }
+
+    return relativePath + filename;
   }
 }
