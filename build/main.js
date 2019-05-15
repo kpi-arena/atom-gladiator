@@ -232,7 +232,6 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         this.sendSettings({});
     }
     setValues(values, newPath) {
-        console.log(values);
         this._configPath = newPath;
         if (this._statusView) {
             this._statusView.update(true, newPath);

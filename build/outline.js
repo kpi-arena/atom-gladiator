@@ -158,12 +158,6 @@ class ScoreOutline {
             this._result.set(relatedUri, []);
         });
         this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
-        // @ts-ignore
-        console.log(
-        // @ts-ignore
-        `${this._superDoc._newToOld.length} - ${
-        // @ts-ignore
-        this._textDoc.getLineOffsets().length}`);
         const tasks = this.getTasksArray(yaml_ast_parser_1.load(this._superDoc.content));
         if (tasks) {
             const totalTasks = this.parseTasks(tasks, atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath));
@@ -349,7 +343,6 @@ class ScoreOutline {
                 previous = line;
             }
         }
-        console.log(this._superDoc.includes.keys());
         return this._superDoc.transformRange(vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(previous, 0), vscode_languageserver_protocol_1.Position.create(previous, 99)));
     }
 }

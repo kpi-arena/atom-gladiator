@@ -1,21 +1,6 @@
 import { Convert } from 'atom-languageclient';
-import {
-  DocumentSymbol,
-  Position,
-  Range,
-  SymbolKind,
-  TextDocument,
-} from 'vscode-languageserver-protocol';
-import {
-  Kind,
-  load,
-  YAMLAnchorReference,
-  YamlMap,
-  YAMLMapping,
-  YAMLNode,
-  YAMLScalar,
-  YAMLSequence,
-} from 'yaml-ast-parser';
+import { DocumentSymbol, Position, Range, SymbolKind, TextDocument } from 'vscode-languageserver-protocol';
+import { Kind, load, YAMLAnchorReference, YamlMap, YAMLMapping, YAMLNode, YAMLScalar, YAMLSequence } from 'yaml-ast-parser';
 import { SpecialDocument } from './special-document';
 import { LANGUAGE_ID } from './util';
 
@@ -304,14 +289,6 @@ export class ScoreOutline {
       0,
       _superDoc.content,
     );
-    // @ts-ignore
-    console.log(
-      // @ts-ignore
-      `${this._superDoc._newToOld.length} - ${
-        // @ts-ignore
-        this._textDoc.getLineOffsets().length
-      }`,
-    );
 
     const tasks = this.getTasksArray(load(this._superDoc.content));
 
@@ -578,8 +555,6 @@ export class ScoreOutline {
         previous = line;
       }
     }
-
-    console.log(this._superDoc.includes.keys());
 
     return this._superDoc.transformRange(
       Range.create(Position.create(previous, 0), Position.create(previous, 99)),

@@ -210,7 +210,6 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   private setValues(values: IConfigValues, newPath: string) {
-    console.log(values);
     this._configPath = newPath;
 
     if (this._statusView) {
