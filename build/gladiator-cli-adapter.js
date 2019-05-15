@@ -75,7 +75,9 @@ function problemsetPack(view, scriptPath) {
         return;
     }
     view.getInput('Name of the package', '', 'Enter the the name of the package without the .zip suffix.', (input) => {
-        getProcessPromise(['problemset', 'pack'], { scriptPath });
+        if (input.length > 0) {
+            getProcessPromise(['problemset', 'pack', input], { scriptPath });
+        }
     });
 }
 exports.problemsetPack = problemsetPack;

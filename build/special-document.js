@@ -257,6 +257,9 @@ class SpecialDocument {
                     start: doc.positionAt(docOffsets[index]),
                     end: doc.positionAt(doc.getText().length),
                 });
+                if (docLine.length === 0 && pathStack.length !== 1) {
+                    break;
+                }
             }
             else {
                 docLine = doc.getText({
@@ -287,8 +290,8 @@ class SpecialDocument {
                 /* If there is an Error parsing the subdocument, throw an ReferenceError.
                 If the error is already an ReferenceError pass the error by throwing it. */
                 try {
+                    this._includes.set(this._newToOld.length - 1, subDocPath);
                     newContent = this.buildDocument(newContent, subDocPath, intendation.concat(includeMatch[1] ? this.getIndendation(docLine) : ''), editorDocs, pathStack);
-                    this._includes.set(index, subDocPath);
                 }
                 catch (err) {
                     this._includeErrors.push(new include_error_1.IncludeError(subDocPath, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(index, docLine.length - 1 - includeMatch[2].length), vscode_languageserver_protocol_1.Position.create(index, docLine.length - 1)), atom_languageclient_1.Convert.pathToUri(docPath), err.message ? 1 : 0));

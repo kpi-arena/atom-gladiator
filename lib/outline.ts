@@ -271,8 +271,8 @@ export class SingleFileOutline {
 }
 
 interface ITask {
-  type: number;
-  title: string | null;
+  type?: number;
+  title?: string | null;
   score: number;
   replicas: number;
 }
@@ -291,20 +291,27 @@ export class ScoreOutline {
     SymbolKind.Constant,
   ];
   private _result: Map<string, DocumentSymbol[]> = new Map();
-
   private _textDoc: TextDocument;
 
   constructor(private _superDoc: SpecialDocument) {
+    this._superDoc.relatedUris.forEach(relatedUri => {
+      this._result.set(relatedUri, []);
+    });
+
     this._textDoc = TextDocument.create(
       Convert.pathToUri(this._superDoc.rootPath),
       LANGUAGE_ID,
       0,
       _superDoc.content,
     );
-
-    this._superDoc.relatedUris.forEach(relatedUri => {
-      this._result.set(relatedUri, []);
-    });
+    // @ts-ignore
+    console.log(
+      // @ts-ignore
+      `${this._superDoc._newToOld.length} - ${
+        // @ts-ignore
+        this._textDoc.getLineOffsets().length
+      }`,
+    );
 
     const tasks = this.getTasksArray(load(this._superDoc.content));
 
@@ -386,19 +393,23 @@ export class ScoreOutline {
   ): [DocumentSymbol | null, number] {
     if (node.kind === Kind.MAP) {
       let result: ITask = {
-        type: -1,
-        title: null,
-        score: 0,
-        replicas: 0,
+        score: -1,
+        replicas: -1,
       };
 
       result = this.parseTaskMap(node, result);
+
+      if (result.type === undefined || !result.title) {
+        return [null, 0];
+      }
 
       if (result.type < 0 || !result.title) {
         return [null, 0];
       }
 
-      if (result.replicas > 0) {
+      if (result.score === -1) {
+        result.score = 0;
+      } else if (result.replicas > 0) {
         result.score = result.score * result.replicas;
       }
 
@@ -418,7 +429,7 @@ export class ScoreOutline {
       const tasks = this.getTasksArray(node);
 
       if (result.type === 0 && tasks) {
-        const suite = this.parseTasks(tasks, previousUri);
+        const suite = this.parseTasks(tasks, currentUri);
         children = suite[0];
         result.score += suite[1];
       }
@@ -475,16 +486,24 @@ export class ScoreOutline {
       (node as YamlMap).mappings.forEach(mapping => {
         switch (mapping.key.value) {
           case 'type':
-            result.type = this.getType(mapping.value);
+            if (result.type === undefined) {
+              result.type = this.getType(mapping.value);
+            }
             return;
           case 'title':
-            result.title = this.getString(mapping.value);
+            if (!result.title) {
+              result.title = this.getString(mapping.value);
+            }
             return;
           case 'score':
-            result.score = this.getNumber(mapping.value);
+            if (result.score < 0) {
+              result.score = this.getNumber(mapping.value);
+            }
             return;
           case 'replicas':
-            result.replicas = this.getNumber(mapping.value);
+            if (result.replicas < 0) {
+              result.replicas = this.getNumber(mapping.value);
+            }
             return;
           case '<<':
             result = this.parseTaskMap(mapping.value.value, result);
@@ -559,6 +578,8 @@ export class ScoreOutline {
         previous = line;
       }
     }
+
+    console.log(this._superDoc.includes.keys());
 
     return this._superDoc.transformRange(
       Range.create(Position.create(previous, 0), Position.create(previous, 99)),

@@ -144,7 +144,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
                 }
             },
         }));
-        atom.config.set('core.debugLSP', true);
+        atom.config.set('core.debugLSP', false);
         if (state.serverSettings) {
             this._settings = state.serverSettings;
         }
@@ -232,6 +232,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         this.sendSettings({});
     }
     setValues(values, newPath) {
+        console.log(values);
         this._configPath = newPath;
         if (this._statusView) {
             this._statusView.update(true, newPath);

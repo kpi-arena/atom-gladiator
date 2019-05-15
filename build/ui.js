@@ -34,12 +34,12 @@ class CommandPalleteView {
         if (this.getMiniEditorElement().hasFocus()) {
             this.restoreFocus();
         }
-        this.callback(this.content);
         this.miniEditor.setText('');
         this.content = '';
     }
     confirm() {
         this.content = this.miniEditor.getText();
+        this.callback(this.content);
         this.close();
     }
     storeFocusedElement() {

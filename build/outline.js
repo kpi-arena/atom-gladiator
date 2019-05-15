@@ -154,10 +154,16 @@ class ScoreOutline {
             vscode_languageserver_protocol_1.SymbolKind.Constant,
         ];
         this._result = new Map();
-        this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
         this._superDoc.relatedUris.forEach(relatedUri => {
             this._result.set(relatedUri, []);
         });
+        this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
+        // @ts-ignore
+        console.log(
+        // @ts-ignore
+        `${this._superDoc._newToOld.length} - ${
+        // @ts-ignore
+        this._textDoc.getLineOffsets().length}`);
         const tasks = this.getTasksArray(yaml_ast_parser_1.load(this._superDoc.content));
         if (tasks) {
             const totalTasks = this.parseTasks(tasks, atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath));
@@ -210,16 +216,20 @@ class ScoreOutline {
     parseGenericTask(node, previousUri) {
         if (node.kind === yaml_ast_parser_1.Kind.MAP) {
             let result = {
-                type: -1,
-                title: null,
-                score: 0,
-                replicas: 0,
+                score: -1,
+                replicas: -1,
             };
             result = this.parseTaskMap(node, result);
+            if (result.type === undefined || !result.title) {
+                return [null, 0];
+            }
             if (result.type < 0 || !result.title) {
                 return [null, 0];
             }
-            if (result.replicas > 0) {
+            if (result.score === -1) {
+                result.score = 0;
+            }
+            else if (result.replicas > 0) {
                 result.score = result.score * result.replicas;
             }
             const currentUri = this._superDoc.getOriginUri(this._textDoc.positionAt(node.startPosition).line);
@@ -227,7 +237,7 @@ class ScoreOutline {
             let children = [];
             const tasks = this.getTasksArray(node);
             if (result.type === 0 && tasks) {
-                const suite = this.parseTasks(tasks, previousUri);
+                const suite = this.parseTasks(tasks, currentUri);
                 children = suite[0];
                 result.score += suite[1];
             }
@@ -254,16 +264,24 @@ class ScoreOutline {
             node.mappings.forEach(mapping => {
                 switch (mapping.key.value) {
                     case 'type':
-                        result.type = this.getType(mapping.value);
+                        if (result.type === undefined) {
+                            result.type = this.getType(mapping.value);
+                        }
                         return;
                     case 'title':
-                        result.title = this.getString(mapping.value);
+                        if (!result.title) {
+                            result.title = this.getString(mapping.value);
+                        }
                         return;
                     case 'score':
-                        result.score = this.getNumber(mapping.value);
+                        if (result.score < 0) {
+                            result.score = this.getNumber(mapping.value);
+                        }
                         return;
                     case 'replicas':
-                        result.replicas = this.getNumber(mapping.value);
+                        if (result.replicas < 0) {
+                            result.replicas = this.getNumber(mapping.value);
+                        }
                         return;
                     case '<<':
                         result = this.parseTaskMap(mapping.value.value, result);
@@ -331,6 +349,7 @@ class ScoreOutline {
                 previous = line;
             }
         }
+        console.log(this._superDoc.includes.keys());
         return this._superDoc.transformRange(vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(previous, 0), vscode_languageserver_protocol_1.Position.create(previous, 99)));
     }
 }

@@ -314,7 +314,7 @@ export class SpecialDocument {
     };
   }
 
-  public getOriginUri(line: number) {
+  public getOriginUri(line: number): string {
     if (this._newToOld[line]) {
       return this._newToOld[line].originUri;
     } else {
@@ -347,7 +347,7 @@ export class SpecialDocument {
     /* Using @ts-ignore to ignore the error, caused by accessing private method
     to obtain line offsets od the document. */
     // @ts-ignore
-    const docOffsets: number[] = doc.getLineOffsets();
+    const docOffsets = doc.getLineOffsets();
 
     for (let index = 0; index < docOffsets.length; index++) {
       let docLine: string;
@@ -360,6 +360,9 @@ export class SpecialDocument {
           start: doc.positionAt(docOffsets[index]),
           end: doc.positionAt(doc.getText().length),
         });
+        if (docLine.length === 0 && pathStack.length !== 1) {
+          break;
+        }
       } else {
         docLine = doc.getText({
           start: doc.positionAt(docOffsets[index]),
@@ -369,7 +372,7 @@ export class SpecialDocument {
 
       newContent = newContent.concat(intendation, docLine);
 
-      const newLineRelation = {
+      const newLineRelation: ILinesRelation = {
         newLine: this._newToOld.length,
         originLine: index,
         originUri: Convert.pathToUri(docPath),
@@ -395,6 +398,7 @@ export class SpecialDocument {
         /* If there is an Error parsing the subdocument, throw an ReferenceError.
         If the error is already an ReferenceError pass the error by throwing it. */
         try {
+          this._includes.set(this._newToOld.length - 1, subDocPath);
           newContent = this.buildDocument(
             newContent,
             subDocPath,
@@ -404,7 +408,6 @@ export class SpecialDocument {
             editorDocs,
             pathStack,
           );
-          this._includes.set(index, subDocPath);
         } catch (err) {
           this._includeErrors.push(
             new IncludeError(
