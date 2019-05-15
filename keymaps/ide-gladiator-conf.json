@@ -1,5 +1,5 @@
 {
   "atom-workspace": {
-    "ctrl-alt-o": "yaml-schema-interface:toggle"
+    "ctrl-alt-p": "gladiator:pack-problemset"
   }
 }
