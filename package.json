@@ -15,7 +15,7 @@
     "node": "*"
   },
   "scripts": {
-    "install": "tsc"
+    "build": "tsc"
   },
   "dependencies": {
     "atom-languageclient": "^0.9.9",
