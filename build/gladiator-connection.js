@@ -191,7 +191,6 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         }
     }
     gotoDefinition(params) {
-        console.log('motorkooooo\n\n');
         if (this._docs.has(params.textDocument.uri)) {
             return new Promise((resolve, reject) => {
                 const specLink = this._docs.get(params.textDocument.uri).getLocation(params);

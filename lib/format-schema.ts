@@ -57,8 +57,9 @@ class SchemaNode {
 
       case Kind.SEQ:
         (node as YAMLSequence).items.forEach(item => {
-          if (item.kind === Kind.SCALAR && item.value === '$') {
+          if (item.kind === Kind.SCALAR && item.value[0] === '$') {
             this._validateScalars = true;
+            this._key = item.value;
           } else if (item.kind === Kind.MAP) {
             (item as YamlMap).mappings.forEach(mapping => {
               this._items.push(new SchemaNode(mapping));
@@ -77,7 +78,7 @@ class SchemaNode {
       if (!this._key) {
         return false;
       } else {
-        if (this._key === '$') {
+        if (this._key[0] === '$') {
           return true;
         } else if ((node.key as YAMLNode).value !== this._key) {
           return false;
@@ -123,6 +124,7 @@ export class FormatValidation {
   private _subpath: string = '';
   private _textDoc: TextDocument = TextDocument.create('', '', 0, '');
   private _nodeX: YAMLNode | null = null;
+  private _formatValues: Map<string, string> = new Map();
 
   constructor(private _schema: YAMLNode) {
     if (this._schema.kind === Kind.MAP) {
@@ -188,8 +190,8 @@ export class FormatValidation {
       case Kind.SEQ:
         return this.validateSequence(node as YAMLSequence, schema);
       case Kind.SCALAR:
-        if (schema) {
-          return this.validateScalar(node as YAMLScalar);
+        if (schema && schema.key && schema.key[0] === '$') {
+          return this.validateScalar(node as YAMLScalar, schema.key);
         }
 
       default:
@@ -239,8 +241,8 @@ export class FormatValidation {
         result = result.concat(this.validate(node.value, schema.value));
       }
 
-      if (schema.key === '$') {
-        result = result.concat(this.validateScalar(node.key));
+      if (schema.key && schema.key[0] === '$') {
+        result = result.concat(this.validateScalar(node.key, schema.key));
       }
 
       return result;
@@ -259,8 +261,10 @@ export class FormatValidation {
       });
     } else {
       node.items.forEach(item => {
-        if (schema.validateScalars && item.kind === Kind.SCALAR) {
-          result = result.concat(this.validateScalar(item as YAMLScalar));
+        if (schema.validateScalars && item.kind === Kind.SCALAR && schema.key) {
+          result = result.concat(
+            this.validateScalar(item as YAMLScalar, schema.key),
+          );
 
           return;
         } else if (item.kind === Kind.MAP) {
@@ -268,7 +272,7 @@ export class FormatValidation {
             schema.items.forEach(schemaItem => {
               if (schemaItem.key === mapping.key.value) {
                 result = result.concat(this.validate(mapping, schemaItem));
-              } else if (schemaItem.key === '$') {
+              } else if (schemaItem.key && schemaItem.key[0] === '$') {
                 result = result.concat(this.validate(mapping, schemaItem));
               }
             });
@@ -280,7 +284,77 @@ export class FormatValidation {
     return result;
   }
 
-  private validateScalar(node: YAMLScalar): Diagnostic[] {
+  private validateScalar(node: YAMLScalar, format: string): Diagnostic[] {
+    if (isGlob(node.value)) {
+      return [];
+    } else if (format.length < 1) {
+      return existsSync(join(this._subpath, node.value))
+        ? []
+        : [
+            Diagnostic.create(
+              Range.create(
+                this._textDoc.positionAt(node.startPosition),
+                this._textDoc.positionAt(node.endPosition),
+              ),
+              'File not found.',
+              1,
+            ),
+          ];
+    } else {
+      const formatVariables = format.split('/');
+
+      if (formatVariables.length === 1) {
+        this._formatValues.set(formatVariables[0], node.value);
+
+        return existsSync(join(this._subpath, node.value))
+          ? []
+          : [
+              Diagnostic.create(
+                Range.create(
+                  this._textDoc.positionAt(node.startPosition),
+                  this._textDoc.positionAt(node.endPosition),
+                ),
+                'File not found.',
+                1,
+              ),
+            ];
+      } else {
+        const formatPaths: string[] = [];
+
+        formatVariables.forEach(variable => {
+          if (this._formatValues.has(variable)) {
+            formatPaths.push(this._formatValues.get(variable) as string);
+          }
+        });
+
+        if (formatPaths.length !== formatVariables.length) {
+          return [
+            Diagnostic.create(
+              Range.create(
+                this._textDoc.positionAt(node.startPosition),
+                this._textDoc.positionAt(node.endPosition),
+              ),
+              'File not found.',
+              1,
+            ),
+          ];
+        } else {
+          console.log(join(this._subpath, ...formatPaths, node.value));
+          return existsSync(join(this._subpath, ...formatPaths, node.value))
+            ? []
+            : [
+                Diagnostic.create(
+                  Range.create(
+                    this._textDoc.positionAt(node.startPosition),
+                    this._textDoc.positionAt(node.endPosition),
+                  ),
+                  'File not found.',
+                  1,
+                ),
+              ];
+        }
+      }
+    }
     if (isGlob(node.value)) {
       return [];
     } else if (existsSync(join(this._subpath, node.value))) {
