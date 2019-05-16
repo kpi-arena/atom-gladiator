@@ -86,7 +86,13 @@ export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
     'Enter the the name of the package without the .zip suffix.',
     (input: string) => {
       if (input.length > 0) {
-        getProcessPromise(['problemset', 'pack', input], { scriptPath });
+        getProcessPromise(['problemset', 'pack', `${input}.zip`], {
+          scriptPath,
+        });
+      } else {
+        getProcessPromise(['problemset', 'pack', `package.zip`], {
+          scriptPath,
+        });
       }
     },
   );
@@ -154,7 +160,7 @@ export function dockerImageBuild(scriptPath?: string) {
     return;
   }
 
-  getProcessPromise(['docker-image', 'build'], { scriptPath });
+  getProcessPromise(['docker-image', 'build', '-L'], { scriptPath });
 }
 
 export function getGladiatorFormat() {

@@ -76,7 +76,14 @@ function problemsetPack(view, scriptPath) {
     }
     view.getInput('Name of the package', '', 'Enter the the name of the package without the .zip suffix.', (input) => {
         if (input.length > 0) {
-            getProcessPromise(['problemset', 'pack', input], { scriptPath });
+            getProcessPromise(['problemset', 'pack', `${input}.zip`], {
+                scriptPath,
+            });
+        }
+        else {
+            getProcessPromise(['problemset', 'pack', `package.zip`], {
+                scriptPath,
+            });
         }
     });
 }
@@ -124,7 +131,7 @@ function dockerImageBuild(scriptPath) {
         noScriptPathWarning();
         return;
     }
-    getProcessPromise(['docker-image', 'build'], { scriptPath });
+    getProcessPromise(['docker-image', 'build', '-L'], { scriptPath });
 }
 exports.dockerImageBuild = dockerImageBuild;
 function getGladiatorFormat() {

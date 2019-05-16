@@ -196,7 +196,10 @@ class FormatValidation {
         }
         else {
             node.items.forEach(item => {
-                if (schema.validateScalars && item.kind === yaml_ast_parser_1.Kind.SCALAR && schema.key) {
+                if (schema.validateScalars &&
+                    item.kind === yaml_ast_parser_1.Kind.SCALAR &&
+                    schema.key &&
+                    !node.value) {
                     result = result.concat(this.validateScalar(item, schema.key));
                     return;
                 }
