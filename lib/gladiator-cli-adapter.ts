@@ -5,10 +5,8 @@ import { getProjectOrHomePath } from './util';
 
 export const CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
 export const CONFIG_FILE_NAME = '.gladiator.yml';
-export const PROBLEMSET_URL =
-  '/gladiator/api/v2/utils/schema/problemset-definition';
-export const VARIANTS_URL =
-  '/gladiator/api/v2/utils/schema/problemset-variants';
+export const PROBLEMSET_URL = '/api/v2/utils/schema/problemset-definition';
+export const VARIANTS_URL = '/api/v2/utils/schema/problemset-variants';
 
 export function isInstalled(): Promise<boolean> {
   return getProcessPromise([], { silent: true })

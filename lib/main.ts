@@ -130,7 +130,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     this._connection = _server.connection as GladiatorConnection;
 
-    this.findAndSetConfig();
+    // this.findAndSetConfig();
   }
 
   public getGrammarScopes(): string[] {
@@ -212,7 +212,12 @@ export class GladiatorConfClient extends AutoLanguageClient {
   }
 
   private setValues(values: IConfigValues, newPath: string) {
-    this._configPath = newPath;
+    if (this._configPath !== newPath) {
+      this._configPath = newPath;
+      atom.notifications.addSuccess(`Config file set active.`, {
+        description: `${newPath}`,
+      });
+    }
 
     if (this._statusView) {
       this._statusView.update(true, newPath);

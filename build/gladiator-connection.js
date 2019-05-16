@@ -202,6 +202,10 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
                 }
             });
         }
+        else if (this._format &&
+            params.textDocument.uri.match(gladiator_cli_adapter_1.CONFIG_FILE_REGEX)) {
+            return new Promise(resolve => resolve(this._format.getLocations(params)));
+        }
         else {
             return super.gotoDefinition(params);
         }

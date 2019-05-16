@@ -165,7 +165,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     postInitialization(_server) {
         super.postInitialization(_server);
         this._connection = _server.connection;
-        this.findAndSetConfig();
+        // this.findAndSetConfig();
     }
     getGrammarScopes() {
         return ['source.yaml', 'source.yml'];
@@ -235,7 +235,12 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         this.sendSettings({});
     }
     setValues(values, newPath) {
-        this._configPath = newPath;
+        if (this._configPath !== newPath) {
+            this._configPath = newPath;
+            atom.notifications.addSuccess(`Config file set active.`, {
+                description: `${newPath}`,
+            });
+        }
         if (this._statusView) {
             this._statusView.update(true, newPath);
         }

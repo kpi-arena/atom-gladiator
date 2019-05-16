@@ -1,10 +1,11 @@
+import { Convert } from 'atom-languageclient';
+import * as fs from 'fs';
 import { existsSync } from 'fs';
 import isGlob from 'is-glob';
 import { join } from 'path';
 import {
-  CompletionItem,
-  CompletionParams,
   Diagnostic,
+  Location,
   Range,
   TextDocument,
   TextDocumentPositionParams,
@@ -125,6 +126,7 @@ export class FormatValidation {
   private _textDoc: TextDocument = TextDocument.create('', '', 0, '');
   private _nodeX: YAMLNode | null = null;
   private _formatValues: Map<string, string> = new Map();
+  private _locations: Location[] = [];
 
   constructor(private _schema: YAMLNode) {
     if (this._schema.kind === Kind.MAP) {
@@ -145,14 +147,34 @@ export class FormatValidation {
     return this.validate(node);
   }
 
-  public getCompletionItems(
-    params: TextDocumentPositionParams | CompletionParams,
-  ): CompletionItem[] {
-    if (this._nodeX) {
-      this.isRelatedCompletion(
-        this._nodeX,
-        this._textDoc.offsetAt(params.position),
-      );
+  // public getCompletionItems(
+  //   params: TextDocumentPositionParams | CompletionParams,
+  // ): CompletionItem[] {
+  //   if (this._nodeX) {
+  //     this.isRelatedCompletion(
+  //       this._nodeX,
+  //       this._textDoc.offsetAt(params.position),
+  //     );
+  //   }
+
+  //   return [];
+  // }
+
+  public getLocations(
+    params: TextDocumentPositionParams,
+  ): Location | Location[] {
+    for (let index = 0; index < this._locations.length; index++) {
+      if (this._locations[index].range.start.line === params.position.line) {
+        const stats = fs.lstatSync(
+          Convert.uriToPath(this._locations[index].uri),
+        );
+
+        if (stats.isDirectory()) {
+          return [];
+        } else {
+          return this._locations[index];
+        }
+      }
     }
 
     return [];
@@ -297,9 +319,48 @@ export class FormatValidation {
     } else if (format.length < 2) {
       const scalarPath = join(this._subpath, node.value);
 
-      return existsSync(scalarPath)
-        ? []
-        : [
+      if (existsSync(scalarPath)) {
+        this._locations.push({
+          range: Range.create(
+            this._textDoc.positionAt(node.startPosition),
+            this._textDoc.positionAt(node.endPosition),
+          ),
+          uri: Convert.uriToPath(scalarPath),
+        });
+
+        return [];
+      } else {
+        return [
+          Diagnostic.create(
+            Range.create(
+              this._textDoc.positionAt(node.startPosition),
+              this._textDoc.positionAt(node.endPosition),
+            ),
+            `File not found: ${scalarPath}`,
+            1,
+          ),
+        ];
+      }
+    } else {
+      const formatVariables = format.split('/');
+
+      if (formatVariables.length === 1) {
+        this._formatValues.set(formatVariables[0], node.value);
+
+        const scalarPath = join(this._subpath, node.value);
+
+        if (existsSync(scalarPath)) {
+          this._locations.push({
+            range: Range.create(
+              this._textDoc.positionAt(node.startPosition),
+              this._textDoc.positionAt(node.endPosition),
+            ),
+            uri: Convert.uriToPath(scalarPath),
+          });
+
+          return [];
+        } else {
+          return [
             Diagnostic.create(
               Range.create(
                 this._textDoc.positionAt(node.startPosition),
@@ -309,26 +370,7 @@ export class FormatValidation {
               1,
             ),
           ];
-    } else {
-      const formatVariables = format.split('/');
-
-      if (formatVariables.length === 1) {
-        this._formatValues.set(formatVariables[0], node.value);
-
-        const scalarPath = join(this._subpath, node.value);
-
-        return existsSync(scalarPath)
-          ? []
-          : [
-              Diagnostic.create(
-                Range.create(
-                  this._textDoc.positionAt(node.startPosition),
-                  this._textDoc.positionAt(node.endPosition),
-                ),
-                `File not found: ${scalarPath}`,
-                1,
-              ),
-            ];
+        }
       } else {
         const formatPaths: string[] = [];
 
@@ -352,95 +394,105 @@ export class FormatValidation {
         } else {
           const scalarPath = join(this._subpath, ...formatPaths, node.value);
 
-          return existsSync(scalarPath)
-            ? []
-            : [
-                Diagnostic.create(
-                  Range.create(
-                    this._textDoc.positionAt(node.startPosition),
-                    this._textDoc.positionAt(node.endPosition),
-                  ),
-                  `File not found: ${scalarPath}`,
-                  1,
+          if (existsSync(scalarPath)) {
+            this._locations.push({
+              range: Range.create(
+                this._textDoc.positionAt(node.startPosition),
+                this._textDoc.positionAt(node.endPosition),
+              ),
+              uri: Convert.uriToPath(scalarPath),
+            });
+
+            return [];
+          } else {
+            return [
+              Diagnostic.create(
+                Range.create(
+                  this._textDoc.positionAt(node.startPosition),
+                  this._textDoc.positionAt(node.endPosition),
                 ),
-              ];
+                `File not found: ${scalarPath}`,
+                1,
+              ),
+            ];
+          }
         }
       }
     }
   }
 
-  private isRelatedCompletion(node: YAMLNode, position: number): boolean {
-    const route: IRouteNode[] = [];
+  // private isRelatedCompletion(node: YAMLNode, position: number): boolean {
+  //   const route: IRouteNode[] = [];
 
-    let changed: boolean = true;
+  //   let changed: boolean = true;
 
-    while (node.kind !== Kind.SCALAR && changed) {
-      changed = false;
+  //   while (node.kind !== Kind.SCALAR && changed) {
+  //     changed = false;
 
-      if (
-        node.key &&
-        (node.key as YAMLNode).startPosition < position &&
-        (node.key as YAMLNode).endPosition > position
-      ) {
-        return false;
-      }
+  //     if (
+  //       node.key &&
+  //       (node.key as YAMLNode).startPosition < position &&
+  //       (node.key as YAMLNode).endPosition > position
+  //     ) {
+  //       return false;
+  //     }
 
-      switch (node.kind) {
-        case Kind.ANCHOR_REF:
-          node = node.value;
-          changed = true;
-          break;
+  //     switch (node.kind) {
+  //       case Kind.ANCHOR_REF:
+  //         node = node.value;
+  //         changed = true;
+  //         break;
 
-        case Kind.MAP:
-          (node as YamlMap).mappings.forEach(mapping => {
-            if (
-              mapping.startPosition < position &&
-              mapping.endPosition > position
-            ) {
-              node = mapping;
-              changed = true;
-            }
-          });
-          break;
+  //       case Kind.MAP:
+  //         (node as YamlMap).mappings.forEach(mapping => {
+  //           if (
+  //             mapping.startPosition < position &&
+  //             mapping.endPosition > position
+  //           ) {
+  //             node = mapping;
+  //             changed = true;
+  //           }
+  //         });
+  //         break;
 
-        case Kind.MAPPING:
-          const valueKind = this.resolveKind(node);
+  //       case Kind.MAPPING:
+  //         const valueKind = this.resolveKind(node);
 
-          if (valueKind) {
-            route.push({
-              key: node.key ? node.key.value : '',
-              kind: valueKind,
-            });
+  //         if (valueKind) {
+  //           route.push({
+  //             key: node.key ? node.key.value : '',
+  //             kind: valueKind,
+  //           });
 
-            node = node.value;
+  //           node = node.value;
 
-            changed = true;
-          }
-          break;
+  //           changed = true;
+  //         }
+  //         break;
 
-        case Kind.SEQ:
-          (node as YAMLSequence).items.forEach(item => {
-            if (item.startPosition < position && item.endPosition > position) {
-              node = item;
-              changed = true;
-            }
-          });
-          break;
-      }
-    }
+  //       case Kind.SEQ:
+  //         (node as YAMLSequence).items.forEach(item => {
+  //           if (item.startPosition < position && item.endPosition > position) {
+  //             node = item;
+  //             changed = true;
+  //           }
+  //         });
+  //         break;
+  //     }
+  //   }
 
-    const schemaRoute = this._routes.get(route[0].key);
+  //   const schemaRoute = this._routes.get(route[0].key);
 
-    return true;
-  }
+  //   return true;
+  // }
 
-  private resolveKind(node: YAMLNode): Kind | null {
-    if (node.value && node.kind === Kind.ANCHOR_REF) {
-      return this.resolveKind(node.value);
-    } else if (node.value) {
-      return node.value.kind;
-    } else {
-      return null;
-    }
-  }
+  // private resolveKind(node: YAMLNode): Kind | null {
+  //   if (node.value && node.kind === Kind.ANCHOR_REF) {
+  //     return this.resolveKind(node.value);
+  //   } else if (node.value) {
+  //     return node.value.kind;
+  //   } else {
+  //     return null;
+  //   }
+  // }
 }

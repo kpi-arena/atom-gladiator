@@ -238,16 +238,16 @@ class ScoreOutline {
             }
             if (currentUri !== previousUri) {
                 const currentResult = this._result.get(currentUri);
-                currentResult.push(vscode_languageserver_protocol_1.DocumentSymbol.create(`${result.title}(${result.score})`, undefined, this._taskTypeSymbol[result.type], range, range, children));
+                currentResult.push(vscode_languageserver_protocol_1.DocumentSymbol.create(`${result.title} (${result.score})`, undefined, this._taskTypeSymbol[result.type], range, range, children));
                 const include = this.getPreviousInclude(this._textDoc.positionAt(node.startPosition).line);
                 return [
-                    vscode_languageserver_protocol_1.DocumentSymbol.create(`${include[1]}(${result.score})`, undefined, vscode_languageserver_protocol_1.SymbolKind.String, include[0], include[0], []),
+                    vscode_languageserver_protocol_1.DocumentSymbol.create(`${include[1]} (${result.score})`, undefined, vscode_languageserver_protocol_1.SymbolKind.String, include[0], include[0], []),
                     result.score,
                 ];
             }
             else {
                 return [
-                    vscode_languageserver_protocol_1.DocumentSymbol.create(`${result.title}(${result.score})`, undefined, this._taskTypeSymbol[result.type], range, range, children),
+                    vscode_languageserver_protocol_1.DocumentSymbol.create(`${result.title} (${result.score})`, undefined, this._taskTypeSymbol[result.type], range, range, children),
                     result.score,
                 ];
             }
@@ -256,6 +256,7 @@ class ScoreOutline {
     }
     parseTaskMap(node, result) {
         if (node.kind === yaml_ast_parser_1.Kind.MAP) {
+            let anchor = null;
             node.mappings.forEach(mapping => {
                 switch (mapping.key.value) {
                     case 'type':
@@ -279,10 +280,13 @@ class ScoreOutline {
                         }
                         return;
                     case '<<':
-                        result = this.parseTaskMap(mapping.value.value, result);
+                        anchor = mapping.value.value;
                         return;
                 }
             });
+            if (anchor) {
+                result = this.parseTaskMap(anchor, result);
+            }
         }
         return result;
     }

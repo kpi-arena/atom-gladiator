@@ -1,8 +1,17 @@
 "use strict";
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (Object.hasOwnProperty.call(mod, k)) result[k] = mod[k];
+    result["default"] = mod;
+    return result;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const atom_languageclient_1 = require("atom-languageclient");
+const fs = __importStar(require("fs"));
 const fs_1 = require("fs");
 const is_glob_1 = __importDefault(require("is-glob"));
 const path_1 = require("path");
@@ -98,6 +107,7 @@ class FormatValidation {
         this._textDoc = vscode_languageserver_protocol_1.TextDocument.create('', '', 0, '');
         this._nodeX = null;
         this._formatValues = new Map();
+        this._locations = [];
         if (this._schema.kind === yaml_ast_parser_1.Kind.MAP) {
             this._schema.mappings.forEach(mapping => {
                 this._routes.set(mapping.key.value, new SchemaNode(mapping.value));
@@ -112,9 +122,28 @@ class FormatValidation {
         this._textDoc = doc;
         return this.validate(node);
     }
-    getCompletionItems(params) {
-        if (this._nodeX) {
-            this.isRelatedCompletion(this._nodeX, this._textDoc.offsetAt(params.position));
+    // public getCompletionItems(
+    //   params: TextDocumentPositionParams | CompletionParams,
+    // ): CompletionItem[] {
+    //   if (this._nodeX) {
+    //     this.isRelatedCompletion(
+    //       this._nodeX,
+    //       this._textDoc.offsetAt(params.position),
+    //     );
+    //   }
+    //   return [];
+    // }
+    getLocations(params) {
+        for (let index = 0; index < this._locations.length; index++) {
+            if (this._locations[index].range.start.line === params.position.line) {
+                const stats = fs.lstatSync(atom_languageclient_1.Convert.uriToPath(this._locations[index].uri));
+                if (stats.isDirectory()) {
+                    return [];
+                }
+                else {
+                    return this._locations[index];
+                }
+            }
         }
         return [];
     }
@@ -227,22 +256,36 @@ class FormatValidation {
         }
         else if (format.length < 2) {
             const scalarPath = path_1.join(this._subpath, node.value);
-            return fs_1.existsSync(scalarPath)
-                ? []
-                : [
+            if (fs_1.existsSync(scalarPath)) {
+                this._locations.push({
+                    range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),
+                    uri: atom_languageclient_1.Convert.uriToPath(scalarPath),
+                });
+                return [];
+            }
+            else {
+                return [
                     vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                 ];
+            }
         }
         else {
             const formatVariables = format.split('/');
             if (formatVariables.length === 1) {
                 this._formatValues.set(formatVariables[0], node.value);
                 const scalarPath = path_1.join(this._subpath, node.value);
-                return fs_1.existsSync(scalarPath)
-                    ? []
-                    : [
+                if (fs_1.existsSync(scalarPath)) {
+                    this._locations.push({
+                        range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),
+                        uri: atom_languageclient_1.Convert.uriToPath(scalarPath),
+                    });
+                    return [];
+                }
+                else {
+                    return [
                         vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                     ];
+                }
             }
             else {
                 const formatPaths = [];
@@ -258,72 +301,20 @@ class FormatValidation {
                 }
                 else {
                     const scalarPath = path_1.join(this._subpath, ...formatPaths, node.value);
-                    return fs_1.existsSync(scalarPath)
-                        ? []
-                        : [
+                    if (fs_1.existsSync(scalarPath)) {
+                        this._locations.push({
+                            range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),
+                            uri: atom_languageclient_1.Convert.uriToPath(scalarPath),
+                        });
+                        return [];
+                    }
+                    else {
+                        return [
                             vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                         ];
+                    }
                 }
             }
-        }
-    }
-    isRelatedCompletion(node, position) {
-        const route = [];
-        let changed = true;
-        while (node.kind !== yaml_ast_parser_1.Kind.SCALAR && changed) {
-            changed = false;
-            if (node.key &&
-                node.key.startPosition < position &&
-                node.key.endPosition > position) {
-                return false;
-            }
-            switch (node.kind) {
-                case yaml_ast_parser_1.Kind.ANCHOR_REF:
-                    node = node.value;
-                    changed = true;
-                    break;
-                case yaml_ast_parser_1.Kind.MAP:
-                    node.mappings.forEach(mapping => {
-                        if (mapping.startPosition < position &&
-                            mapping.endPosition > position) {
-                            node = mapping;
-                            changed = true;
-                        }
-                    });
-                    break;
-                case yaml_ast_parser_1.Kind.MAPPING:
-                    const valueKind = this.resolveKind(node);
-                    if (valueKind) {
-                        route.push({
-                            key: node.key ? node.key.value : '',
-                            kind: valueKind,
-                        });
-                        node = node.value;
-                        changed = true;
-                    }
-                    break;
-                case yaml_ast_parser_1.Kind.SEQ:
-                    node.items.forEach(item => {
-                        if (item.startPosition < position && item.endPosition > position) {
-                            node = item;
-                            changed = true;
-                        }
-                    });
-                    break;
-            }
-        }
-        const schemaRoute = this._routes.get(route[0].key);
-        return true;
-    }
-    resolveKind(node) {
-        if (node.value && node.kind === yaml_ast_parser_1.Kind.ANCHOR_REF) {
-            return this.resolveKind(node.value);
-        }
-        else if (node.value) {
-            return node.value.kind;
-        }
-        else {
-            return null;
         }
     }
 }
