@@ -122,12 +122,17 @@ class FormatValidation {
         this._textDoc = doc;
         return this.validate(node);
     }
-    getCompletionItems(params) {
-        if (this._nodeX) {
-            this.isRelatedCompletion(this._nodeX, this._textDoc.offsetAt(params.position));
-        }
-        return [];
-    }
+    // public getCompletionItems(
+    //   params: TextDocumentPositionParams | CompletionParams,
+    // ): CompletionItem[] {
+    //   if (this._nodeX) {
+    //     this.isRelatedCompletion(
+    //       this._nodeX,
+    //       this._textDoc.offsetAt(params.position),
+    //     );
+    //   }
+    //   return [];
+    // }
     getLocations(params) {
         for (let index = 0; index < this._locations.length; index++) {
             if (this._locations[index].range.start.line === params.position.line) {
@@ -310,65 +315,6 @@ class FormatValidation {
                     }
                 }
             }
-        }
-    }
-    isRelatedCompletion(node, position) {
-        const route = [];
-        let changed = true;
-        while (node.kind !== yaml_ast_parser_1.Kind.SCALAR && changed) {
-            changed = false;
-            if (node.key &&
-                node.key.startPosition < position &&
-                node.key.endPosition > position) {
-                return false;
-            }
-            switch (node.kind) {
-                case yaml_ast_parser_1.Kind.ANCHOR_REF:
-                    node = node.value;
-                    changed = true;
-                    break;
-                case yaml_ast_parser_1.Kind.MAP:
-                    node.mappings.forEach(mapping => {
-                        if (mapping.startPosition < position &&
-                            mapping.endPosition > position) {
-                            node = mapping;
-                            changed = true;
-                        }
-                    });
-                    break;
-                case yaml_ast_parser_1.Kind.MAPPING:
-                    const valueKind = this.resolveKind(node);
-                    if (valueKind) {
-                        route.push({
-                            key: node.key ? node.key.value : '',
-                            kind: valueKind,
-                        });
-                        node = node.value;
-                        changed = true;
-                    }
-                    break;
-                case yaml_ast_parser_1.Kind.SEQ:
-                    node.items.forEach(item => {
-                        if (item.startPosition < position && item.endPosition > position) {
-                            node = item;
-                            changed = true;
-                        }
-                    });
-                    break;
-            }
-        }
-        const schemaRoute = this._routes.get(route[0].key);
-        return true;
-    }
-    resolveKind(node) {
-        if (node.value && node.kind === yaml_ast_parser_1.Kind.ANCHOR_REF) {
-            return this.resolveKind(node.value);
-        }
-        else if (node.value) {
-            return node.value.kind;
-        }
-        else {
-            return null;
         }
     }
 }

@@ -4,8 +4,6 @@ import { existsSync } from 'fs';
 import isGlob from 'is-glob';
 import { join } from 'path';
 import {
-  CompletionItem,
-  CompletionParams,
   Diagnostic,
   Location,
   Range,
@@ -149,18 +147,18 @@ export class FormatValidation {
     return this.validate(node);
   }
 
-  public getCompletionItems(
-    params: TextDocumentPositionParams | CompletionParams,
-  ): CompletionItem[] {
-    if (this._nodeX) {
-      this.isRelatedCompletion(
-        this._nodeX,
-        this._textDoc.offsetAt(params.position),
-      );
-    }
+  // public getCompletionItems(
+  //   params: TextDocumentPositionParams | CompletionParams,
+  // ): CompletionItem[] {
+  //   if (this._nodeX) {
+  //     this.isRelatedCompletion(
+  //       this._nodeX,
+  //       this._textDoc.offsetAt(params.position),
+  //     );
+  //   }
 
-    return [];
-  }
+  //   return [];
+  // }
 
   public getLocations(
     params: TextDocumentPositionParams,
@@ -423,78 +421,78 @@ export class FormatValidation {
     }
   }
 
-  private isRelatedCompletion(node: YAMLNode, position: number): boolean {
-    const route: IRouteNode[] = [];
+  // private isRelatedCompletion(node: YAMLNode, position: number): boolean {
+  //   const route: IRouteNode[] = [];
 
-    let changed: boolean = true;
+  //   let changed: boolean = true;
 
-    while (node.kind !== Kind.SCALAR && changed) {
-      changed = false;
+  //   while (node.kind !== Kind.SCALAR && changed) {
+  //     changed = false;
 
-      if (
-        node.key &&
-        (node.key as YAMLNode).startPosition < position &&
-        (node.key as YAMLNode).endPosition > position
-      ) {
-        return false;
-      }
+  //     if (
+  //       node.key &&
+  //       (node.key as YAMLNode).startPosition < position &&
+  //       (node.key as YAMLNode).endPosition > position
+  //     ) {
+  //       return false;
+  //     }
 
-      switch (node.kind) {
-        case Kind.ANCHOR_REF:
-          node = node.value;
-          changed = true;
-          break;
+  //     switch (node.kind) {
+  //       case Kind.ANCHOR_REF:
+  //         node = node.value;
+  //         changed = true;
+  //         break;
 
-        case Kind.MAP:
-          (node as YamlMap).mappings.forEach(mapping => {
-            if (
-              mapping.startPosition < position &&
-              mapping.endPosition > position
-            ) {
-              node = mapping;
-              changed = true;
-            }
-          });
-          break;
+  //       case Kind.MAP:
+  //         (node as YamlMap).mappings.forEach(mapping => {
+  //           if (
+  //             mapping.startPosition < position &&
+  //             mapping.endPosition > position
+  //           ) {
+  //             node = mapping;
+  //             changed = true;
+  //           }
+  //         });
+  //         break;
 
-        case Kind.MAPPING:
-          const valueKind = this.resolveKind(node);
+  //       case Kind.MAPPING:
+  //         const valueKind = this.resolveKind(node);
 
-          if (valueKind) {
-            route.push({
-              key: node.key ? node.key.value : '',
-              kind: valueKind,
-            });
+  //         if (valueKind) {
+  //           route.push({
+  //             key: node.key ? node.key.value : '',
+  //             kind: valueKind,
+  //           });
 
-            node = node.value;
+  //           node = node.value;
 
-            changed = true;
-          }
-          break;
+  //           changed = true;
+  //         }
+  //         break;
 
-        case Kind.SEQ:
-          (node as YAMLSequence).items.forEach(item => {
-            if (item.startPosition < position && item.endPosition > position) {
-              node = item;
-              changed = true;
-            }
-          });
-          break;
-      }
-    }
+  //       case Kind.SEQ:
+  //         (node as YAMLSequence).items.forEach(item => {
+  //           if (item.startPosition < position && item.endPosition > position) {
+  //             node = item;
+  //             changed = true;
+  //           }
+  //         });
+  //         break;
+  //     }
+  //   }
 
-    const schemaRoute = this._routes.get(route[0].key);
+  //   const schemaRoute = this._routes.get(route[0].key);
 
-    return true;
-  }
+  //   return true;
+  // }
 
-  private resolveKind(node: YAMLNode): Kind | null {
-    if (node.value && node.kind === Kind.ANCHOR_REF) {
-      return this.resolveKind(node.value);
-    } else if (node.value) {
-      return node.value.kind;
-    } else {
-      return null;
-    }
-  }
+  // private resolveKind(node: YAMLNode): Kind | null {
+  //   if (node.value && node.kind === Kind.ANCHOR_REF) {
+  //     return this.resolveKind(node.value);
+  //   } else if (node.value) {
+  //     return node.value.kind;
+  //   } else {
+  //     return null;
+  //   }
+  // }
 }

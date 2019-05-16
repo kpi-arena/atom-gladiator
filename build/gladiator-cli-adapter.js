@@ -12,8 +12,8 @@ const path = __importStar(require("path"));
 const util_1 = require("./util");
 exports.CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
 exports.CONFIG_FILE_NAME = '.gladiator.yml';
-exports.PROBLEMSET_URL = '/gladiator/api/v2/utils/schema/problemset-definition';
-exports.VARIANTS_URL = '/gladiator/api/v2/utils/schema/problemset-variants';
+exports.PROBLEMSET_URL = '/api/v2/utils/schema/problemset-definition';
+exports.VARIANTS_URL = '/api/v2/utils/schema/problemset-variants';
 function isInstalled() {
     return getProcessPromise([], { silent: true })
         .then(() => {
