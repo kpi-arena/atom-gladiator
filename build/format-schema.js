@@ -178,11 +178,13 @@ class FormatValidation {
         }
         else {
             let result = [];
+            if (schema.key && schema.key[0] === '$') {
+                if (schema.value && schema.value.kind === node.value.kind) {
+                    result = result.concat(this.validateScalar(node.key, schema.key));
+                }
+            }
             if (schema.value) {
                 result = result.concat(this.validate(node.value, schema.value));
-            }
-            if (schema.key && schema.key[0] === '$') {
-                result = result.concat(this.validateScalar(node.key, schema.key));
             }
             return result;
         }
@@ -223,21 +225,23 @@ class FormatValidation {
         if (is_glob_1.default(node.value)) {
             return [];
         }
-        else if (format.length < 1) {
-            return fs_1.existsSync(path_1.join(this._subpath, node.value))
+        else if (format.length < 2) {
+            const scalarPath = path_1.join(this._subpath, node.value);
+            return fs_1.existsSync(scalarPath)
                 ? []
                 : [
-                    vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                    vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                 ];
         }
         else {
             const formatVariables = format.split('/');
             if (formatVariables.length === 1) {
                 this._formatValues.set(formatVariables[0], node.value);
-                return fs_1.existsSync(path_1.join(this._subpath, node.value))
+                const scalarPath = path_1.join(this._subpath, node.value);
+                return fs_1.existsSync(scalarPath)
                     ? []
                     : [
-                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                     ];
             }
             else {
@@ -247,16 +251,17 @@ class FormatValidation {
                         formatPaths.push(this._formatValues.get(variable));
                     }
                 });
-                if (formatPaths.length !== formatVariables.length) {
+                if (formatPaths.length !== formatVariables.length - 1) {
                     return [
-                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                        vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File on higher level not found.`, 1),
                     ];
                 }
                 else {
-                    return fs_1.existsSync(path_1.join(this._subpath, ...formatPaths, node.value))
+                    const scalarPath = path_1.join(this._subpath, ...formatPaths, node.value);
+                    return fs_1.existsSync(scalarPath)
                         ? []
                         : [
-                            vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), 'File not found.', 1),
+                            vscode_languageserver_protocol_1.Diagnostic.create(vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)), `File not found: ${scalarPath}`, 1),
                         ];
                 }
             }
