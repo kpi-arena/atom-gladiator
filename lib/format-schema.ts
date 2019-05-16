@@ -237,12 +237,14 @@ export class FormatValidation {
     } else {
       let result: Diagnostic[] = [];
 
-      if (schema.value) {
-        result = result.concat(this.validate(node.value, schema.value));
+      if (schema.key && schema.key[0] === '$') {
+        if (schema.value && schema.value.kind === node.value.kind) {
+          result = result.concat(this.validateScalar(node.key, schema.key));
+        }
       }
 
-      if (schema.key && schema.key[0] === '$') {
-        result = result.concat(this.validateScalar(node.key, schema.key));
+      if (schema.value) {
+        result = result.concat(this.validate(node.value, schema.value));
       }
 
       return result;
@@ -292,8 +294,10 @@ export class FormatValidation {
   private validateScalar(node: YAMLScalar, format: string): Diagnostic[] {
     if (isGlob(node.value)) {
       return [];
-    } else if (format.length < 1) {
-      return existsSync(join(this._subpath, node.value))
+    } else if (format.length < 2) {
+      const scalarPath = join(this._subpath, node.value);
+
+      return existsSync(scalarPath)
         ? []
         : [
             Diagnostic.create(
@@ -301,7 +305,7 @@ export class FormatValidation {
                 this._textDoc.positionAt(node.startPosition),
                 this._textDoc.positionAt(node.endPosition),
               ),
-              'File not found.',
+              `File not found: ${scalarPath}`,
               1,
             ),
           ];
@@ -311,7 +315,9 @@ export class FormatValidation {
       if (formatVariables.length === 1) {
         this._formatValues.set(formatVariables[0], node.value);
 
-        return existsSync(join(this._subpath, node.value))
+        const scalarPath = join(this._subpath, node.value);
+
+        return existsSync(scalarPath)
           ? []
           : [
               Diagnostic.create(
@@ -319,7 +325,7 @@ export class FormatValidation {
                   this._textDoc.positionAt(node.startPosition),
                   this._textDoc.positionAt(node.endPosition),
                 ),
-                'File not found.',
+                `File not found: ${scalarPath}`,
                 1,
               ),
             ];
@@ -332,19 +338,21 @@ export class FormatValidation {
           }
         });
 
-        if (formatPaths.length !== formatVariables.length) {
+        if (formatPaths.length !== formatVariables.length - 1) {
           return [
             Diagnostic.create(
               Range.create(
                 this._textDoc.positionAt(node.startPosition),
                 this._textDoc.positionAt(node.endPosition),
               ),
-              'File not found.',
+              `File on higher level not found.`,
               1,
             ),
           ];
         } else {
-          return existsSync(join(this._subpath, ...formatPaths, node.value))
+          const scalarPath = join(this._subpath, ...formatPaths, node.value);
+
+          return existsSync(scalarPath)
             ? []
             : [
                 Diagnostic.create(
@@ -352,7 +360,7 @@ export class FormatValidation {
                     this._textDoc.positionAt(node.startPosition),
                     this._textDoc.positionAt(node.endPosition),
                   ),
-                  'File not found.',
+                  `File not found: ${scalarPath}`,
                   1,
                 ),
               ];
