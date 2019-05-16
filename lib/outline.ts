@@ -432,7 +432,7 @@ export class ScoreOutline {
 
         currentResult.push(
           DocumentSymbol.create(
-            `${result.title}(${result.score})`,
+            `${result.title} (${result.score})`,
             undefined,
             this._taskTypeSymbol[result.type],
             range,
@@ -447,7 +447,7 @@ export class ScoreOutline {
 
         return [
           DocumentSymbol.create(
-            `${include[1]}(${result.score})`,
+            `${include[1]} (${result.score})`,
             undefined,
             SymbolKind.String,
             include[0],
@@ -459,7 +459,7 @@ export class ScoreOutline {
       } else {
         return [
           DocumentSymbol.create(
-            `${result.title}(${result.score})`,
+            `${result.title} (${result.score})`,
             undefined,
             this._taskTypeSymbol[result.type],
             range,
@@ -476,6 +476,8 @@ export class ScoreOutline {
 
   private parseTaskMap(node: YAMLNode, result: ITask) {
     if (node.kind === Kind.MAP) {
+      let anchor: YAMLNode | null = null;
+
       (node as YamlMap).mappings.forEach(mapping => {
         switch (mapping.key.value) {
           case 'type':
@@ -499,10 +501,14 @@ export class ScoreOutline {
             }
             return;
           case '<<':
-            result = this.parseTaskMap(mapping.value.value, result);
+            anchor = mapping.value.value;
             return;
         }
       });
+
+      if (anchor) {
+        result = this.parseTaskMap(anchor, result);
+      }
     }
 
     return result;
