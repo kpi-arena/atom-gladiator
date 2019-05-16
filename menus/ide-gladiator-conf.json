@@ -4,19 +4,27 @@
       "label": "Packages",
       "submenu": [
         {
-          "label": "ide-gladiator-conf",
+          "label": "gladiator",
           "submenu": [
             {
-              "label": "Show",
-              "command": "yaml-schema-interface:show"
+              "label": "Generate files",
+              "command": "gladiator:generate-files"
             },
             {
-              "label": "Hide",
-              "command": "yaml-schema-interface:hide"
+              "label": "Pack problemset",
+              "command": "gladiator:pack-problemset"
             },
             {
-              "label": "Toggle",
-              "command": "yaml-schema-interface:toggle"
+              "label": "Push problemset",
+              "command": "gladiator:push-problemset"
+            },
+            {
+              "label": "Pack docker image",
+              "command": "gladiator:docker-image-pack"
+            },
+            {
+              "label": "Build docker image",
+              "command": "gladiator:docker-image-build"
             }
           ]
         }

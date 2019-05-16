@@ -1,14 +1,14 @@
 {
-  "name": "ide-gladiator-conf",
+  "name": "gladiator",
   "main": "./build/main.js",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Extension providing support for wirting Gladiator configuration files.",
   "keywords": [
     "yaml",
     "ide-yaml",
     "schema"
   ],
-  "repository": "https://git.kpi.fei.tuke.sk/rk740eq/ide-gladiator-conf",
+  "repository": "https://github.com/roland-kister/atom-gladiator",
   "license": "MIT",
   "engines": {
     "atom": ">=1.0.0 <2.0.0",

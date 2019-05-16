@@ -261,7 +261,12 @@ export class FormatValidation {
       });
     } else {
       node.items.forEach(item => {
-        if (schema.validateScalars && item.kind === Kind.SCALAR && schema.key) {
+        if (
+          schema.validateScalars &&
+          item.kind === Kind.SCALAR &&
+          schema.key &&
+          !node.value
+        ) {
           result = result.concat(
             this.validateScalar(item as YAMLScalar, schema.key),
           );
