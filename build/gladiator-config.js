@@ -36,9 +36,9 @@ function readConfigValues(node) {
     const problemsetPath = getValueFromKey(node, 'problemset-definition');
     const variantsPath = getValueFromKey(node, 'problemset-variants');
     result.apiUrl = apiUrl ? apiUrl : undefined;
-    result.problemsetPath = problemsetPath ? problemsetPath : undefined;
+    result.problemsetPath = problemsetPath ? problemsetPath : 'problemset.yml';
     result.problemsetSchema = apiUrl ? `${apiUrl}${gladiator_cli_adapter_1.PROBLEMSET_URL}` : undefined;
-    result.variantsPath = variantsPath ? variantsPath : undefined;
+    result.variantsPath = variantsPath ? variantsPath : 'problemset-variants.yml';
     result.variantSchema = apiUrl ? `${apiUrl}${gladiator_cli_adapter_1.VARIANTS_URL}` : undefined;
     return result;
 }

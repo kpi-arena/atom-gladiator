@@ -56,9 +56,9 @@ function readConfigValues(node: YAMLNode): IConfigValues {
   const variantsPath = getValueFromKey(node, 'problemset-variants');
 
   result.apiUrl = apiUrl ? apiUrl : undefined;
-  result.problemsetPath = problemsetPath ? problemsetPath : undefined;
+  result.problemsetPath = problemsetPath ? problemsetPath : 'problemset.yml';
   result.problemsetSchema = apiUrl ? `${apiUrl}${PROBLEMSET_URL}` : undefined;
-  result.variantsPath = variantsPath ? variantsPath : undefined;
+  result.variantsPath = variantsPath ? variantsPath : 'problemset-variants.yml';
   result.variantSchema = apiUrl ? `${apiUrl}${VARIANTS_URL}` : undefined;
 
   return result;
