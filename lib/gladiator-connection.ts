@@ -296,6 +296,13 @@ export class GladiatorConnection extends LanguageClientConnection {
           resolve(specLink);
         }
       });
+    } else if (
+      this._format &&
+      params.textDocument.uri.match(CONFIG_FILE_REGEX)
+    ) {
+      return new Promise<Location | Location[]>(resolve =>
+        resolve((this._format as FormatValidation).getLocations(params)),
+      );
     } else {
       return super.gotoDefinition(params);
     }
