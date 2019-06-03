@@ -1,3 +1,4 @@
+*gladiator*'s goal is to fully support the creation of configration file of *Gladiator* test runner. This test runner operates at *Arena* platform and it's configuration files defines the problemset.
 
 # Dependencies
 

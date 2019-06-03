@@ -66,7 +66,7 @@ function getConfigFilePath(silent) {
     });
 }
 exports.getConfigFilePath = getConfigFilePath;
-function problemsetPack(view, scriptPath) {
+function packProblemset(view, scriptPath) {
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -87,8 +87,8 @@ function problemsetPack(view, scriptPath) {
         }
     });
 }
-exports.problemsetPack = problemsetPack;
-function problemsetPush(view, scriptPath) {
+exports.packProblemset = packProblemset;
+function pushProblemset(view, scriptPath) {
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -111,8 +111,8 @@ function problemsetPush(view, scriptPath) {
         });
     });
 }
-exports.problemsetPush = problemsetPush;
-function dockerImagePack(scriptPath) {
+exports.pushProblemset = pushProblemset;
+function packDockerImage(scriptPath) {
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -122,8 +122,8 @@ function dockerImagePack(scriptPath) {
     }
     getProcessPromise(['docker-image', 'pack'], { scriptPath });
 }
-exports.dockerImagePack = dockerImagePack;
-function dockerImageBuild(scriptPath) {
+exports.packDockerImage = packDockerImage;
+function buildDockerImage(scriptPath) {
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -133,7 +133,7 @@ function dockerImageBuild(scriptPath) {
     }
     getProcessPromise(['docker-image', 'build', '-L'], { scriptPath });
 }
-exports.dockerImageBuild = dockerImageBuild;
+exports.buildDockerImage = buildDockerImage;
 function getGladiatorFormat() {
     return getProcessPromise(['files', 'gladiator-format'], { silent: true });
 }

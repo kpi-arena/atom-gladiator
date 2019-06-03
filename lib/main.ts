@@ -16,15 +16,15 @@ import {
 } from './gladiator-config';
 import { GladiatorConnection } from './gladiator-connection';
 import { getDefaultSettings } from './server-settings';
-import { SpecialDocument } from './special-document';
-import CommandPalleteView, { GladiatorStatusView } from './ui';
+import { ComposedDocument } from './special-document';
+import CommandPaletteView, { GladiatorStatusView } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: GladiatorConnection | null = null;
   private _settings = getDefaultSettings();
   private _configPath: string | null = null;
   private _subscriptions = new CompositeDisposable();
-  private _insertView = new CommandPalleteView();
+  private _insertView = new CommandPaletteView();
   private _statusView: GladiatorStatusView | null = null;
 
   // @ts-ignore
@@ -57,12 +57,12 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:pack-problemset': () => {
           if (this._configPath) {
-            cli.problemsetPack(
+            cli.packProblemset(
               this._insertView,
               path.dirname(this._configPath),
             );
           } else {
-            cli.problemsetPack(this._insertView);
+            cli.packProblemset(this._insertView);
           }
         },
       }),
@@ -70,12 +70,12 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:push-problemset': () => {
           if (this._configPath) {
-            cli.problemsetPush(
+            cli.pushProblemset(
               this._insertView,
               path.dirname(this._configPath),
             );
           } else {
-            cli.problemsetPush(this._insertView);
+            cli.pushProblemset(this._insertView);
           }
         },
       }),
@@ -83,9 +83,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:docker-image-pack': () => {
           if (this._configPath) {
-            cli.dockerImagePack(path.dirname(this._configPath));
+            cli.packDockerImage(path.dirname(this._configPath));
           } else {
-            cli.dockerImagePack();
+            cli.packDockerImage();
           }
         },
       }),
@@ -93,9 +93,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:docker-image-build': () => {
           if (this._configPath) {
-            cli.dockerImageBuild(path.dirname(this._configPath));
+            cli.buildDockerImage(path.dirname(this._configPath));
           } else {
-            cli.dockerImageBuild();
+            cli.buildDockerImage();
           }
         },
       }),
@@ -159,7 +159,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     ]) as LanguageServerProcess;
   }
 
-  private findAndSetConfig(): void {
+  private async findAndSetConfig() {
     const editorPath = atom.workspace.getActiveTextEditor()
       ? (atom.workspace.getActiveTextEditor() as TextEditor).getPath()
       : null;
@@ -183,14 +183,13 @@ export class GladiatorConfClient extends AutoLanguageClient {
         this.findAndSetConfig();
       }
     } else if (this._connection) {
-      cli
-        .getConfigFilePath(true)
-        .then(confPath => {
-          getConfigValues(confPath)
-            .then(values => this.setValues(values, confPath))
-            .catch(() => this.unsetValues());
-        })
-        .catch(() => this.unsetValues());
+      try {
+        const configPath = await cli.getConfigFilePath(true);
+        const configValues = await getConfigValues(configPath);
+        this.setValues(configValues, configPath);
+      } catch {
+        this.unsetValues();
+      }
     } else {
       this.unsetValues();
     }
@@ -200,7 +199,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     this._configPath = null;
 
     if (this._statusView) {
-      this._statusView.update(false);
+      this._statusView.update();
     }
 
     if (this._connection) {
@@ -220,7 +219,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     }
 
     if (this._statusView) {
-      this._statusView.update(true, newPath);
+      this._statusView.update(newPath);
     }
 
     if (this._connection) {
@@ -261,7 +260,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
       if (values.problemsetPath) {
         this._connection.addSpecialDoc(
-          new SpecialDocument(
+          new ComposedDocument(
             path.join(path.dirname(configPath), values.problemsetPath),
           ),
           true,
@@ -270,7 +269,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
       if (values.variantsPath) {
         this._connection.addSpecialDoc(
-          new SpecialDocument(
+          new ComposedDocument(
             path.join(path.dirname(configPath), values.variantsPath),
           ),
           false,
@@ -279,11 +278,11 @@ export class GladiatorConfClient extends AutoLanguageClient {
     }
   }
 
-  private updateStatusBar(rootpath?: string) {
-    if (rootpath && this._statusView) {
-      this._statusView.update(true, rootpath);
+  private updateStatusBar(rootPath?: string) {
+    if (rootPath && this._statusView) {
+      this._statusView.update(rootPath);
     } else if (this._statusView) {
-      this._statusView.update(false);
+      this._statusView.update();
     }
   }
 

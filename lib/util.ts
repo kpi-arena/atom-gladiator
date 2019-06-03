@@ -51,7 +51,7 @@ export function getBasicTextDocument(
     editorDocs = getOpenYAMLDocuments();
   }
 
-  let doc = getOpenYAMLDocuments().get(docPath);
+  let doc = editorDocs.get(docPath);
 
   /* Checking if the document is open in the editor. In case it's not, get
   the doc from the drive. */
@@ -62,11 +62,13 @@ export function getBasicTextDocument(
   return doc;
 }
 
+/**
+ * Creating a TextDocument from a YAML file located on the drive. If error
+ * occurs while reading file, the error is caught and undefined is returned.
+ */
 export function getDocumentFromDrive(
   docPath: string,
 ): TextDocument | undefined {
-  /* Creating a TextDocument from a YAML file located on the drive. If error
-  occurs while reading file, the error is caught and undefined is returned. */
   try {
     return TextDocument.create(
       Convert.pathToUri(docPath),

@@ -103,7 +103,7 @@ class FormatValidation {
     constructor(_schema) {
         this._schema = _schema;
         this._routes = new Map();
-        this._subpath = '';
+        this._subPath = '';
         this._textDoc = vscode_languageserver_protocol_1.TextDocument.create('', '', 0, '');
         this._nodeX = null;
         this._formatValues = new Map();
@@ -115,7 +115,7 @@ class FormatValidation {
         }
     }
     set subPath(subPath) {
-        this._subpath = subPath;
+        this._subPath = subPath;
     }
     getDiagnostics(node, doc) {
         this._nodeX = node;
@@ -134,14 +134,14 @@ class FormatValidation {
     //   return [];
     // }
     getLocations(params) {
-        for (let index = 0; index < this._locations.length; index++) {
-            if (this._locations[index].range.start.line === params.position.line) {
-                const stats = fs.lstatSync(atom_languageclient_1.Convert.uriToPath(this._locations[index].uri));
+        for (const location of this._locations) {
+            if (location.range.start.line === params.position.line) {
+                const stats = fs.lstatSync(atom_languageclient_1.Convert.uriToPath(location.uri));
                 if (stats.isDirectory()) {
                     return [];
                 }
                 else {
-                    return this._locations[index];
+                    return location;
                 }
             }
         }
@@ -255,7 +255,7 @@ class FormatValidation {
             return [];
         }
         else if (format.length < 2) {
-            const scalarPath = path_1.join(this._subpath, node.value);
+            const scalarPath = path_1.join(this._subPath, node.value);
             if (fs_1.existsSync(scalarPath)) {
                 this._locations.push({
                     range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),
@@ -273,7 +273,7 @@ class FormatValidation {
             const formatVariables = format.split('/');
             if (formatVariables.length === 1) {
                 this._formatValues.set(formatVariables[0], node.value);
-                const scalarPath = path_1.join(this._subpath, node.value);
+                const scalarPath = path_1.join(this._subPath, node.value);
                 if (fs_1.existsSync(scalarPath)) {
                     this._locations.push({
                         range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),
@@ -300,7 +300,7 @@ class FormatValidation {
                     ];
                 }
                 else {
-                    const scalarPath = path_1.join(this._subpath, ...formatPaths, node.value);
+                    const scalarPath = path_1.join(this._subPath, ...formatPaths, node.value);
                     if (fs_1.existsSync(scalarPath)) {
                         this._locations.push({
                             range: vscode_languageserver_protocol_1.Range.create(this._textDoc.positionAt(node.startPosition), this._textDoc.positionAt(node.endPosition)),

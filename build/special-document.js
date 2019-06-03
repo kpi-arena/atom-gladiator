@@ -12,7 +12,7 @@ const path = __importStar(require("path"));
 const vscode_languageserver_protocol_1 = require("vscode-languageserver-protocol");
 const include_error_1 = require("./include-error");
 const util_1 = require("./util");
-class SpecialDocument {
+class ComposedDocument {
     constructor(_rootPath) {
         this._rootPath = _rootPath;
         this.INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include ((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
@@ -291,7 +291,7 @@ class SpecialDocument {
                 If the error is already an ReferenceError pass the error by throwing it. */
                 try {
                     this._includes.set(this._newToOld.length - 1, subDocPath);
-                    newContent = this.buildDocument(newContent, subDocPath, intendation.concat(includeMatch[1] ? this.getIndendation(docLine) : ''), editorDocs, pathStack);
+                    newContent = this.buildDocument(newContent, subDocPath, intendation.concat(includeMatch[1] ? this.getCommentIndentation(docLine) : ''), editorDocs, pathStack);
                 }
                 catch (err) {
                     this._includeErrors.push(new include_error_1.IncludeError(subDocPath, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(index, docLine.length - 1 - includeMatch[2].length), vscode_languageserver_protocol_1.Position.create(index, docLine.length - 1)), atom_languageclient_1.Convert.pathToUri(docPath), err.message ? 1 : 0));
@@ -304,9 +304,9 @@ class SpecialDocument {
     /**
      * Gets the indendation in front of `#` character and returns it.
      *
-     * @param line - line contaiting `#include` comment with intendation.
+     * @param line - line contaiting `#include` comment with indentation.
      */
-    getIndendation(line) {
+    getCommentIndentation(line) {
         let result = '';
         let index = 0;
         while (line[index] !== '#') {
@@ -325,4 +325,4 @@ class SpecialDocument {
         return 'context' in params;
     }
 }
-exports.SpecialDocument = SpecialDocument;
+exports.ComposedDocument = ComposedDocument;

@@ -53,7 +53,7 @@ function getValueFromKey(node, key) {
     }
     else if (node.kind === yaml_ast_parser_1.Kind.MAPPING &&
         node.key.value === key) {
-        result = result = getStringValue(node.value);
+        result = getStringValue(node.value);
     }
     return result;
 }
@@ -67,13 +67,10 @@ function getStringValue(node) {
     else if (node.kind !== yaml_ast_parser_1.Kind.SCALAR) {
         return null;
     }
-    else if (node.valueObject && typeof node.valueObject === 'number') {
-        return null;
-    }
-    else if (typeof node.valueObject === 'boolean') {
-        return null;
+    else if (!node.valueObject) {
+        return node.value;
     }
     else {
-        return node.value;
+        return null;
     }
 }

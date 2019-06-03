@@ -17,7 +17,7 @@ import {
   YAMLScalar,
   YAMLSequence,
 } from 'yaml-ast-parser';
-import { SpecialDocument } from './special-document';
+import { ComposedDocument } from './special-document';
 import { LANGUAGE_ID } from './util';
 
 export class SingleFileOutline {
@@ -294,7 +294,7 @@ export class ScoreOutline {
   private _result: Map<string, DocumentSymbol[]> = new Map();
   private _textDoc: TextDocument;
 
-  constructor(private _superDoc: SpecialDocument) {
+  constructor(private _superDoc: ComposedDocument) {
     this._superDoc.relatedUris.forEach(relatedUri => {
       this._result.set(relatedUri, []);
     });
@@ -306,7 +306,9 @@ export class ScoreOutline {
       _superDoc.content,
     );
 
-    const tasks = this.getTasksArray(load(this._superDoc.content));
+    const rootNode = load(this._superDoc.content);
+
+    const tasks = this.getTasksArray(rootNode);
 
     if (tasks) {
       const totalTasks = this.parseTasks(
@@ -316,7 +318,7 @@ export class ScoreOutline {
 
       this._result.set(Convert.pathToUri(this._superDoc.rootPath), [
         DocumentSymbol.create(
-          `TOTAL: ${totalTasks[1]}`,
+          `${this.getTitle(rootNode)}: ${totalTasks[1]}`,
           undefined,
           SymbolKind.Class,
           Range.create(Position.create(0, 0), Position.create(0, 0)),
@@ -333,6 +335,25 @@ export class ScoreOutline {
     } else {
       return [];
     }
+  }
+
+  private getTitle(node: YAMLNode): string {
+    let result: string = 'TOTAL';
+
+    if (node.kind === Kind.MAP) {
+      (node as YamlMap).mappings.forEach(mapping => {
+        if (!mapping.value) {
+          return;
+        } else if (
+          mapping.key.value === 'title' &&
+          mapping.value.kind === Kind.SCALAR
+        ) {
+          result = mapping.value.value as string;
+        }
+      });
+    }
+
+    return result;
   }
 
   private getTasksArray(node: YAMLNode): YAMLSequence | null {

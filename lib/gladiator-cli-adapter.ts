@@ -68,7 +68,7 @@ export function getConfigFilePath(silent: boolean): Promise<string> {
   });
 }
 
-export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
+export function packProblemset(view: CommandPalleteView, scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }
@@ -96,7 +96,7 @@ export function problemsetPack(view: CommandPalleteView, scriptPath?: string) {
   );
 }
 
-export function problemsetPush(view: CommandPalleteView, scriptPath?: string) {
+export function pushProblemset(view: CommandPalleteView, scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }
@@ -135,7 +135,7 @@ export function problemsetPush(view: CommandPalleteView, scriptPath?: string) {
   );
 }
 
-export function dockerImagePack(scriptPath?: string) {
+export function packDockerImage(scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }
@@ -148,7 +148,7 @@ export function dockerImagePack(scriptPath?: string) {
   getProcessPromise(['docker-image', 'pack'], { scriptPath });
 }
 
-export function dockerImageBuild(scriptPath?: string) {
+export function buildDockerImage(scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }

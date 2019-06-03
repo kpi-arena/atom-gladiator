@@ -77,7 +77,7 @@ function getValueFromKey(node: YAMLNode, key: string): string | null {
     node.kind === Kind.MAPPING &&
     (node as YAMLMapping).key.value === key
   ) {
-    result = result = getStringValue((node as YAMLMapping).value);
+    result = getStringValue((node as YAMLMapping).value);
   }
 
   return result;
@@ -90,11 +90,9 @@ function getStringValue(node: YAMLNode): string | null {
     return null;
   } else if (node.kind !== Kind.SCALAR) {
     return null;
-  } else if (node.valueObject && typeof node.valueObject === 'number') {
-    return null;
-  } else if (typeof node.valueObject === 'boolean') {
-    return null;
-  } else {
+  } else if (!node.valueObject) {
     return node.value;
+  } else {
+    return null;
   }
 }

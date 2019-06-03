@@ -44,7 +44,7 @@ export interface ILinesRelation {
   intendationLength: number;
 }
 
-export class SpecialDocument {
+export class ComposedDocument {
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include ((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
 
   private _relatedUris: string[] = [];
@@ -403,7 +403,7 @@ export class SpecialDocument {
             newContent,
             subDocPath,
             intendation.concat(
-              includeMatch[1] ? this.getIndendation(docLine) : '',
+              includeMatch[1] ? this.getCommentIndentation(docLine) : '',
             ),
             editorDocs,
             pathStack,
@@ -435,9 +435,9 @@ export class SpecialDocument {
   /**
    * Gets the indendation in front of `#` character and returns it.
    *
-   * @param line - line contaiting `#include` comment with intendation.
+   * @param line - line contaiting `#include` comment with indentation.
    */
-  private getIndendation(line: string): string {
+  private getCommentIndentation(line: string): string {
     let result = '';
     let index = 0;
 

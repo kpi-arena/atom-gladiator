@@ -110,37 +110,37 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         }), atom.commands.add('atom-workspace', {
             'gladiator:pack-problemset': () => {
                 if (this._configPath) {
-                    cli.problemsetPack(this._insertView, path.dirname(this._configPath));
+                    cli.packProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.problemsetPack(this._insertView);
+                    cli.packProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:push-problemset': () => {
                 if (this._configPath) {
-                    cli.problemsetPush(this._insertView, path.dirname(this._configPath));
+                    cli.pushProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.problemsetPush(this._insertView);
+                    cli.pushProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-pack': () => {
                 if (this._configPath) {
-                    cli.dockerImagePack(path.dirname(this._configPath));
+                    cli.packDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.dockerImagePack();
+                    cli.packDockerImage();
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-build': () => {
                 if (this._configPath) {
-                    cli.dockerImageBuild(path.dirname(this._configPath));
+                    cli.buildDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.dockerImageBuild();
+                    cli.buildDockerImage();
                 }
             },
         }));
@@ -185,7 +185,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             '--stdio',
         ]);
     }
-    findAndSetConfig() {
+    async findAndSetConfig() {
         const editorPath = atom.workspace.getActiveTextEditor()
             ? atom.workspace.getActiveTextEditor().getPath()
             : null;
@@ -210,14 +210,14 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             }
         }
         else if (this._connection) {
-            cli
-                .getConfigFilePath(true)
-                .then(confPath => {
-                gladiator_config_1.getConfigValues(confPath)
-                    .then(values => this.setValues(values, confPath))
-                    .catch(() => this.unsetValues());
-            })
-                .catch(() => this.unsetValues());
+            try {
+                const configPath = await cli.getConfigFilePath(true);
+                const configValues = await gladiator_config_1.getConfigValues(configPath);
+                this.setValues(configValues, configPath);
+            }
+            catch (_a) {
+                this.unsetValues();
+            }
         }
         else {
             this.unsetValues();
@@ -226,7 +226,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     unsetValues() {
         this._configPath = null;
         if (this._statusView) {
-            this._statusView.update(false);
+            this._statusView.update();
         }
         if (this._connection) {
             this._connection.deleteSpecialDocs();
@@ -242,7 +242,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             });
         }
         if (this._statusView) {
-            this._statusView.update(true, newPath);
+            this._statusView.update(newPath);
         }
         if (this._connection) {
             this._connection.formatSubPath = path.dirname(newPath);
@@ -272,19 +272,19 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         if (this._connection) {
             this._connection.deleteSpecialDocs();
             if (values.problemsetPath) {
-                this._connection.addSpecialDoc(new special_document_1.SpecialDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
+                this._connection.addSpecialDoc(new special_document_1.ComposedDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
             }
             if (values.variantsPath) {
-                this._connection.addSpecialDoc(new special_document_1.SpecialDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
+                this._connection.addSpecialDoc(new special_document_1.ComposedDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
             }
         }
     }
-    updateStatusBar(rootpath) {
-        if (rootpath && this._statusView) {
-            this._statusView.update(true, rootpath);
+    updateStatusBar(rootPath) {
+        if (rootPath && this._statusView) {
+            this._statusView.update(rootPath);
         }
         else if (this._statusView) {
-            this._statusView.update(false);
+            this._statusView.update();
         }
     }
 }

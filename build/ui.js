@@ -1,9 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const atom_1 = require("atom");
-class CommandPalleteView {
+class CommandPaletteView {
     constructor() {
-        this.paneItem = null;
         this.previouslyFocusedElement = null;
         this.content = '';
         this.callback = (text) => { };
@@ -84,7 +83,7 @@ class CommandPalleteView {
         return this.miniEditor.element;
     }
 }
-exports.default = CommandPalleteView;
+exports.default = CommandPaletteView;
 class GladiatorStatusView {
     constructor(_statusBar) {
         this._statusBar = _statusBar;
@@ -101,8 +100,8 @@ class GladiatorStatusView {
         });
         this.attach();
     }
-    update(configFound, configPath) {
-        if (!configFound) {
+    update(configPath) {
+        if (!configPath) {
             this._element.style.display = 'none';
         }
         else {
