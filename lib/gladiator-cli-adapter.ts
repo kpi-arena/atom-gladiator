@@ -1,6 +1,6 @@
 import { BufferedProcess, ProcessOptions } from 'atom';
 import * as path from 'path';
-import CommandPalleteView from './ui';
+import CommandPaletteView from './ui';
 import { getProjectOrHomePath } from './util';
 
 export const CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
@@ -34,7 +34,7 @@ export function getSchemaUri(): Promise<string> {
   }).then(value => value.replace(/\r?\n|\r/, ''));
 }
 
-export function generateFilesToDir(view: CommandPalleteView): void {
+export function generateFilesToDir(view: CommandPaletteView): void {
   view.getInput(
     'Enter the project directory',
     getProjectOrHomePath(),
@@ -68,7 +68,7 @@ export function getConfigFilePath(silent: boolean): Promise<string> {
   });
 }
 
-export function packProblemset(view: CommandPalleteView, scriptPath?: string) {
+export function packProblemset(view: CommandPaletteView, scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }
@@ -96,7 +96,7 @@ export function packProblemset(view: CommandPalleteView, scriptPath?: string) {
   );
 }
 
-export function pushProblemset(view: CommandPalleteView, scriptPath?: string) {
+export function pushProblemset(view: CommandPaletteView, scriptPath?: string) {
   if (!scriptPath) {
     scriptPath = getScriptPath();
   }

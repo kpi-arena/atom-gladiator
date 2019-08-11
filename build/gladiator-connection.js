@@ -6,7 +6,7 @@ const yaml_ast_parser_1 = require("yaml-ast-parser");
 const format_schema_1 = require("./format-schema");
 const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
 const outline_1 = require("./outline");
-const special_document_1 = require("./special-document");
+const composed_document_1 = require("./composed-document");
 const util_1 = require("./util");
 class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection {
     constructor(rpc, logger) {
@@ -79,7 +79,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
                     this._docs.delete(uri);
                 }
             }
-            const newDoc = new special_document_1.ComposedDocument(doc.rootPath);
+            const newDoc = new composed_document_1.ComposedDocument(doc.rootPath);
             newDoc.relatedUris.forEach(relatedUri => this._docs.set(relatedUri, newDoc));
             this._versions.set(newDoc, version);
             if (this._scoreOutlineDocs.has(doc.rootPath)) {
