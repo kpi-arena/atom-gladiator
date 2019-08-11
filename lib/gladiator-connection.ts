@@ -26,7 +26,7 @@ import { safeLoad } from 'yaml-ast-parser';
 import { FormatValidation } from './format-schema';
 import { CONFIG_FILE_REGEX, getGladiatorFormat } from './gladiator-cli-adapter';
 import { ScoreOutline, SingleFileOutline } from './outline';
-import { ComposedDocument } from './special-document';
+import { ComposedDocument } from './composed-document';
 import { getOpenYAMLDocuments } from './util';
 
 export class GladiatorConnection extends LanguageClientConnection {

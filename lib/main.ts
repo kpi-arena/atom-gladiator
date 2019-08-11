@@ -16,7 +16,7 @@ import {
 } from './gladiator-config';
 import { GladiatorConnection } from './gladiator-connection';
 import { getDefaultSettings } from './server-settings';
-import { ComposedDocument } from './special-document';
+import { ComposedDocument } from './composed-document';
 import CommandPaletteView, { GladiatorStatusView } from './ui';
 
 export class GladiatorConfClient extends AutoLanguageClient {

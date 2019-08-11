@@ -17,7 +17,7 @@ import {
   YAMLScalar,
   YAMLSequence,
 } from 'yaml-ast-parser';
-import { ComposedDocument } from './special-document';
+import { ComposedDocument } from './composed-document';
 import { LANGUAGE_ID } from './util';
 
 export class SingleFileOutline {

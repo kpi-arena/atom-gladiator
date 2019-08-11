@@ -15,7 +15,7 @@ const cli = __importStar(require("./gladiator-cli-adapter"));
 const gladiator_config_1 = require("./gladiator-config");
 const gladiator_connection_1 = require("./gladiator-connection");
 const server_settings_1 = require("./server-settings");
-const special_document_1 = require("./special-document");
+const composed_document_1 = require("./composed-document");
 const ui_1 = __importStar(require("./ui"));
 class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     constructor() {
@@ -272,10 +272,10 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         if (this._connection) {
             this._connection.deleteSpecialDocs();
             if (values.problemsetPath) {
-                this._connection.addSpecialDoc(new special_document_1.ComposedDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
+                this._connection.addSpecialDoc(new composed_document_1.ComposedDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
             }
             if (values.variantsPath) {
-                this._connection.addSpecialDoc(new special_document_1.ComposedDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
+                this._connection.addSpecialDoc(new composed_document_1.ComposedDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
             }
         }
     }
