@@ -8,7 +8,7 @@
     "ide-yaml",
     "schema"
   ],
-  "repository": "https://github.com/roland-kister/atom-gladiator",
+  "repository": "https://github.com/kpi-arena/atom-gladiator",
   "license": "MIT",
   "engines": {
     "atom": ">=1.0.0 <2.0.0",
