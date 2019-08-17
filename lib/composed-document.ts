@@ -178,15 +178,12 @@ export class ComposedDocument {
       /* Iterating through 'ILinesRelation' array, in which each 'originalLine'
       is equal to the line from params. Only URI needs to be checked and when
       the corresponding one is found, position is changed according to the new
-      position. Note: for-of is not used, since we want to return value from
-      the loop directly. */
-      for (let index = 0; index < lineRelation.length; index++) {
-        if (lineRelation[index].originUri === params.textDocument.uri) {
-          params.position.line = lineRelation[index].newLine;
-          params.position.character += lineRelation[index].intendationLength;
-
+      position. */
+      for (const item of lineRelation) {
+        if (item.originUri === params.textDocument.uri) {
+          params.position.line = item.newLine;
+          params.position.character += item.intendationLength;
           params.textDocument.uri = Convert.pathToUri(this._rootPath);
-
           return params;
         }
       }
