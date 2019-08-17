@@ -31,7 +31,7 @@ function getBasicTextDocument(docPath, editorDocs) {
     if (!editorDocs) {
         editorDocs = getOpenYAMLDocuments();
     }
-    let doc = getOpenYAMLDocuments().get(docPath);
+    let doc = editorDocs.get(docPath);
     /* Checking if the document is open in the editor. In case it's not, get
     the doc from the drive. */
     if (!doc) {
@@ -40,9 +40,11 @@ function getBasicTextDocument(docPath, editorDocs) {
     return doc;
 }
 exports.getBasicTextDocument = getBasicTextDocument;
+/**
+ * Creating a TextDocument from a YAML file located on the drive. If error
+ * occurs while reading file, the error is caught and undefined is returned.
+ */
 function getDocumentFromDrive(docPath) {
-    /* Creating a TextDocument from a YAML file located on the drive. If error
-    occurs while reading file, the error is caught and undefined is returned. */
     try {
         return vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(docPath), exports.LANGUAGE_ID, 0, fs_1.readFileSync(docPath).toString());
     }
@@ -51,3 +53,4 @@ function getDocumentFromDrive(docPath) {
     }
 }
 exports.getDocumentFromDrive = getDocumentFromDrive;
+//# sourceMappingURL=util.js.map

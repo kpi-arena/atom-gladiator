@@ -122,7 +122,7 @@ interface IRouteNode {
 
 export class FormatValidation {
   private _routes: Map<string, SchemaNode> = new Map();
-  private _subpath: string = '';
+  private _subPath: string = '';
   private _textDoc: TextDocument = TextDocument.create('', '', 0, '');
   private _nodeX: YAMLNode | null = null;
   private _formatValues: Map<string, string> = new Map();
@@ -137,7 +137,7 @@ export class FormatValidation {
   }
 
   public set subPath(subPath: string) {
-    this._subpath = subPath;
+    this._subPath = subPath;
   }
 
   public getDiagnostics(node: YAMLNode, doc: TextDocument): Diagnostic[] {
@@ -163,16 +163,14 @@ export class FormatValidation {
   public getLocations(
     params: TextDocumentPositionParams,
   ): Location | Location[] {
-    for (let index = 0; index < this._locations.length; index++) {
-      if (this._locations[index].range.start.line === params.position.line) {
-        const stats = fs.lstatSync(
-          Convert.uriToPath(this._locations[index].uri),
-        );
+    for (const location of this._locations) {
+      if (location.range.start.line === params.position.line) {
+        const stats = fs.lstatSync(Convert.uriToPath(location.uri));
 
         if (stats.isDirectory()) {
           return [];
         } else {
-          return this._locations[index];
+          return location;
         }
       }
     }
@@ -317,7 +315,7 @@ export class FormatValidation {
     if (isGlob(node.value)) {
       return [];
     } else if (format.length < 2) {
-      const scalarPath = join(this._subpath, node.value);
+      const scalarPath = join(this._subPath, node.value);
 
       if (existsSync(scalarPath)) {
         this._locations.push({
@@ -347,7 +345,7 @@ export class FormatValidation {
       if (formatVariables.length === 1) {
         this._formatValues.set(formatVariables[0], node.value);
 
-        const scalarPath = join(this._subpath, node.value);
+        const scalarPath = join(this._subPath, node.value);
 
         if (existsSync(scalarPath)) {
           this._locations.push({
@@ -392,7 +390,7 @@ export class FormatValidation {
             ),
           ];
         } else {
-          const scalarPath = join(this._subpath, ...formatPaths, node.value);
+          const scalarPath = join(this._subPath, ...formatPaths, node.value);
 
           if (existsSync(scalarPath)) {
             this._locations.push({

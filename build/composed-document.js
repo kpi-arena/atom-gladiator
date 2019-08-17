@@ -64,7 +64,7 @@ class ComposedDocument {
             },
         };
     }
-    getwillSave(params) {
+    getWillSave(params) {
         return {
             textDocument: {
                 uri: atom_languageclient_1.Convert.pathToUri(this._rootPath),
@@ -117,12 +117,11 @@ class ComposedDocument {
             /* Iterating through 'ILinesRelation' array, in which each 'originalLine'
             is equal to the line from params. Only URI needs to be checked and when
             the corresponding one is found, position is changed according to the new
-            position. Note: for-of is not used, since we want to return value from
-            the loop directly. */
-            for (let index = 0; index < lineRelation.length; index++) {
-                if (lineRelation[index].originUri === params.textDocument.uri) {
-                    params.position.line = lineRelation[index].newLine;
-                    params.position.character += lineRelation[index].intendationLength;
+            position. */
+            for (const item of lineRelation) {
+                if (item.originUri === params.textDocument.uri) {
+                    params.position.line = item.newLine;
+                    params.position.character += item.indentationLength;
                     params.textDocument.uri = atom_languageclient_1.Convert.pathToUri(this._rootPath);
                     return params;
                 }
@@ -216,11 +215,11 @@ class ComposedDocument {
         return {
             start: {
                 line: startRelation.originLine,
-                character: superRange.start.character - startRelation.intendationLength,
+                character: superRange.start.character - startRelation.indentationLength,
             },
             end: {
                 line: endRelation.originLine,
-                character: superRange.end.character - endRelation.intendationLength,
+                character: superRange.end.character - endRelation.indentationLength,
             },
         };
     }
@@ -273,7 +272,7 @@ class ComposedDocument {
                 originLine: index,
                 originUri: atom_languageclient_1.Convert.pathToUri(docPath),
                 originPath: docPath,
-                intendationLength: intendation.length,
+                indentationLength: intendation.length,
             };
             if (this._oldToNew.has(index)) {
                 this._oldToNew.get(index).push(newLineRelation);
@@ -302,9 +301,9 @@ class ComposedDocument {
         return newContent;
     }
     /**
-     * Gets the indendation in front of `#` character and returns it.
+     * Gets the indentation in front of `#` character and returns it.
      *
-     * @param line - line contaiting `#include` comment with indentation.
+     * @param line - line containing `#include` comment with indentation.
      */
     getCommentIndentation(line) {
         let result = '';
@@ -326,3 +325,4 @@ class ComposedDocument {
     }
 }
 exports.ComposedDocument = ComposedDocument;
+//# sourceMappingURL=composed-document.js.map

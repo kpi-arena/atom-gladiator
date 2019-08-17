@@ -159,11 +159,12 @@ class ScoreOutline {
             this._result.set(relatedUri, []);
         });
         this._textDoc = vscode_languageserver_protocol_1.TextDocument.create(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), util_1.LANGUAGE_ID, 0, _superDoc.content);
-        const tasks = this.getTasksArray(yaml_ast_parser_1.load(this._superDoc.content));
+        const rootNode = yaml_ast_parser_1.load(this._superDoc.content);
+        const tasks = this.getTasksArray(rootNode);
         if (tasks) {
             const totalTasks = this.parseTasks(tasks, atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath));
             this._result.set(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), [
-                vscode_languageserver_protocol_1.DocumentSymbol.create(`TOTAL: ${totalTasks[1]}`, undefined, vscode_languageserver_protocol_1.SymbolKind.Class, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), totalTasks[0]),
+                vscode_languageserver_protocol_1.DocumentSymbol.create(`${this.getTitle(rootNode)}: ${totalTasks[1]}`, undefined, vscode_languageserver_protocol_1.SymbolKind.Class, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), totalTasks[0]),
             ]);
         }
     }
@@ -174,6 +175,21 @@ class ScoreOutline {
         else {
             return [];
         }
+    }
+    getTitle(node) {
+        let result = 'TOTAL';
+        if (node.kind === yaml_ast_parser_1.Kind.MAP) {
+            node.mappings.forEach(mapping => {
+                if (!mapping.value) {
+                    return;
+                }
+                else if (mapping.key.value === 'title' &&
+                    mapping.value.kind === yaml_ast_parser_1.Kind.SCALAR) {
+                    result = mapping.value.value;
+                }
+            });
+        }
+        return result;
     }
     getTasksArray(node) {
         let result = null;
@@ -378,3 +394,4 @@ class ScoreOutline {
     }
 }
 exports.ScoreOutline = ScoreOutline;
+//# sourceMappingURL=outline.js.map

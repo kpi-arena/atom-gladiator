@@ -6,9 +6,9 @@ import {
 
 /**
  * 0 - `include` file couldn't be loaded.
- * 1 - Infice loop caused by `include` comments.
+ * 1 - Infinite loop caused by `include` comments.
  */
-declare type refErrType = 0 | 1;
+declare type RefErrType = 0 | 1;
 
 export class IncludeError extends Error {
   /* Item at index + 1 is an error message to 'refErrType'. */
@@ -27,7 +27,7 @@ export class IncludeError extends Error {
     private _filePath: string,
     private _range: Range,
     private _uri: string,
-    private _errType: refErrType,
+    private _errType: RefErrType,
   ) {
     super();
   }

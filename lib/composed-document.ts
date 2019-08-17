@@ -23,6 +23,14 @@ import {
 } from './util';
 
 /**
+ * PublishDiagnosticsParams include version since version 3.15 of LSP.
+ * However atom-languageclient uses LSP in version 3.12. To prevent issues with
+ * different type definitions between these versions, project uses version 3.12
+ * and here we define our own modified type that allow to include version property.
+ */
+type VersionedPublishDiagnosticsParams = PublishDiagnosticsParams & { version?: number };
+
+/**
  * Represents relation between an original line in document given by URI and
  * new line in the super document. Intendation
  */
@@ -39,12 +47,12 @@ export interface ILinesRelation {
   /* Path of the original document. */
   originPath: string;
 
-  /* Global length of indendation of the original document, not just related
+  /* Global length of indentation of the original document, not just related
   to it's parent documents. */
-  intendationLength: number;
+  indentationLength: number;
 }
 
-export class SpecialDocument {
+export class ComposedDocument {
   private readonly INCLUDE_REGEX = /^(\cI|\t|\x20)*(#include ((\.|\\|\/|\w|-)+(\.yaml|\.yml)))(\cI|\t|\x20)*/;
 
   private _relatedUris: string[] = [];
@@ -110,7 +118,7 @@ export class SpecialDocument {
     };
   }
 
-  public getwillSave(
+  public getWillSave(
     params: WillSaveTextDocumentParams,
   ): WillSaveTextDocumentParams {
     return {
@@ -178,15 +186,12 @@ export class SpecialDocument {
       /* Iterating through 'ILinesRelation' array, in which each 'originalLine'
       is equal to the line from params. Only URI needs to be checked and when
       the corresponding one is found, position is changed according to the new
-      position. Note: for-of is not used, since we want to return value from
-      the loop directly. */
-      for (let index = 0; index < lineRelation.length; index++) {
-        if (lineRelation[index].originUri === params.textDocument.uri) {
-          params.position.line = lineRelation[index].newLine;
-          params.position.character += lineRelation[index].intendationLength;
-
+      position. */
+      for (const item of lineRelation) {
+        if (item.originUri === params.textDocument.uri) {
+          params.position.line = item.newLine;
+          params.position.character += item.indentationLength;
           params.textDocument.uri = Convert.pathToUri(this._rootPath);
-
           return params;
         }
       }
@@ -203,9 +208,9 @@ export class SpecialDocument {
    * @param params - all diagnostics for a super document.
    */
   public filterDiagnostics(
-    params: PublishDiagnosticsParams,
-  ): Map<string, PublishDiagnosticsParams> {
-    const result: Map<string, PublishDiagnosticsParams> = new Map();
+    params: VersionedPublishDiagnosticsParams,
+  ): Map<string, VersionedPublishDiagnosticsParams> {
+    const result: Map<string, VersionedPublishDiagnosticsParams> = new Map();
 
     /* Initialize Map for each related subdocument with it's relatedUri as a
     key. Skipping this steps results in Diagnostics not clearing from editor
@@ -226,7 +231,7 @@ export class SpecialDocument {
       are transformed to correspond with the original document's positions. */
       (result.get(
         startRelation.originUri,
-      ) as PublishDiagnosticsParams).diagnostics.push({
+      ) as VersionedPublishDiagnosticsParams).diagnostics.push({
         code: diagnose.code,
         message: diagnose.message,
         range: this.transformRange(diagnose.range),
@@ -305,11 +310,11 @@ export class SpecialDocument {
     return {
       start: {
         line: startRelation.originLine,
-        character: superRange.start.character - startRelation.intendationLength,
+        character: superRange.start.character - startRelation.indentationLength,
       },
       end: {
         line: endRelation.originLine,
-        character: superRange.end.character - endRelation.intendationLength,
+        character: superRange.end.character - endRelation.indentationLength,
       },
     };
   }
@@ -377,7 +382,7 @@ export class SpecialDocument {
         originLine: index,
         originUri: Convert.pathToUri(docPath),
         originPath: docPath,
-        intendationLength: intendation.length,
+        indentationLength: intendation.length,
       };
 
       if (this._oldToNew.has(index)) {
@@ -403,7 +408,7 @@ export class SpecialDocument {
             newContent,
             subDocPath,
             intendation.concat(
-              includeMatch[1] ? this.getIndendation(docLine) : '',
+              includeMatch[1] ? this.getCommentIndentation(docLine) : '',
             ),
             editorDocs,
             pathStack,
@@ -433,11 +438,11 @@ export class SpecialDocument {
   }
 
   /**
-   * Gets the indendation in front of `#` character and returns it.
+   * Gets the indentation in front of `#` character and returns it.
    *
-   * @param line - line contaiting `#include` comment with intendation.
+   * @param line - line containing `#include` comment with indentation.
    */
-  private getIndendation(line: string): string {
+  private getCommentIndentation(line: string): string {
     let result = '';
     let index = 0;
 

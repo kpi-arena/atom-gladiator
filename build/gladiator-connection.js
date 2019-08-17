@@ -6,7 +6,7 @@ const yaml_ast_parser_1 = require("yaml-ast-parser");
 const format_schema_1 = require("./format-schema");
 const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
 const outline_1 = require("./outline");
-const special_document_1 = require("./special-document");
+const composed_document_1 = require("./composed-document");
 const util_1 = require("./util");
 class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection {
     constructor(rpc, logger) {
@@ -14,7 +14,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         this._docs = new Map();
         this._versions = new Map();
         this._format = null;
-        this._scoreDocs = new Map();
+        this._scoreOutlineDocs = new Map();
         gladiator_cli_adapter_1.getGladiatorFormat()
             .then(value => {
             this._format = new format_schema_1.FormatValidation(yaml_ast_parser_1.safeLoad(value));
@@ -28,20 +28,19 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
             this._docs.set(relatedUri, doc);
         });
         if (hasScore) {
-            this._scoreDocs.set(doc.rootPath, null);
+            this._scoreOutlineDocs.set(doc.rootPath, null);
         }
         this._versions.set(doc, 0);
         super.didOpenTextDocument(doc.getDidOpen());
     }
     isRelated(pathToCheck) {
-        let result = false;
         const uriToCheck = atom_languageclient_1.Convert.pathToUri(pathToCheck);
         for (const uri of this._docs.keys()) {
             if (uri === uriToCheck) {
-                result = true;
+                return true;
             }
         }
-        return result;
+        return false;
     }
     set formatSubPath(subPath) {
         if (subPath && this._format) {
@@ -54,9 +53,8 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         });
         this._docs = new Map();
         this._versions = new Map();
-        this._scoreDocs = new Map();
+        this._scoreOutlineDocs = new Map();
     }
-    // @ts-ignore
     initialize(params) {
         // @ts-ignore
         return super.initialize(params).then(result => {
@@ -80,11 +78,11 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
                     this._docs.delete(uri);
                 }
             }
-            const newDoc = new special_document_1.SpecialDocument(doc.rootPath);
+            const newDoc = new composed_document_1.ComposedDocument(doc.rootPath);
             newDoc.relatedUris.forEach(relatedUri => this._docs.set(relatedUri, newDoc));
             this._versions.set(newDoc, version);
-            if (this._scoreDocs.has(doc.rootPath)) {
-                this._scoreDocs.set(doc.rootPath, null);
+            if (this._scoreOutlineDocs.has(doc.rootPath)) {
+                this._scoreOutlineDocs.set(doc.rootPath, null);
             }
             super.didChangeTextDocument(newDoc.getDidChange(version));
         }
@@ -94,7 +92,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
     }
     willSaveTextDocument(params) {
         if (this._docs.has(params.textDocument.uri)) {
-            return super.willSaveTextDocument(this._docs.get(params.textDocument.uri).getwillSave(params));
+            return super.willSaveTextDocument(this._docs.get(params.textDocument.uri).getWillSave(params));
         }
         else {
             return super.willSaveTextDocument(params);
@@ -104,7 +102,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         if (this._docs.has(params.textDocument.uri)) {
             const doc = this._docs.get(params.textDocument.uri);
             return super
-                .willSaveWaitUntilTextDocument(doc.getwillSave(params))
+                .willSaveWaitUntilTextDocument(doc.getWillSave(params))
                 .then(value => {
                 if (!value) {
                     return value;
@@ -170,14 +168,14 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
     }
     documentSymbol(params, cancellationToken) {
         const specDoc = this._docs.get(params.textDocument.uri);
-        if (specDoc && this._scoreDocs.has(specDoc.rootPath)) {
+        if (specDoc && this._scoreOutlineDocs.has(specDoc.rootPath)) {
             return new Promise(resolve => {
-                let score = this._scoreDocs.get(specDoc.rootPath);
-                if (!score) {
-                    score = new outline_1.ScoreOutline(specDoc);
-                    this._scoreDocs.set(specDoc.rootPath, score);
+                let outline = this._scoreOutlineDocs.get(specDoc.rootPath);
+                if (!outline) {
+                    outline = new outline_1.ScoreOutline(specDoc);
+                    this._scoreOutlineDocs.set(specDoc.rootPath, outline);
                 }
-                resolve(score.getOutline(params.textDocument.uri));
+                resolve(outline.getOutline(params.textDocument.uri));
             });
         }
         const doc = util_1.getOpenYAMLDocuments().get(atom_languageclient_1.Convert.uriToPath(params.textDocument.uri));
@@ -212,3 +210,4 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
     }
 }
 exports.GladiatorConnection = GladiatorConnection;
+//# sourceMappingURL=gladiator-connection.js.map

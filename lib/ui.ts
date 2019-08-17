@@ -1,8 +1,8 @@
 import { Disposable, Panel, TextEditor } from 'atom';
 
-export default class CommandPalleteView {
+export default class CommandPaletteView {
   private miniEditor: TextEditor;
-  private paneItem = null;
+  // private paneItem = null;
   private panel: Panel;
   private previouslyFocusedElement: Element | null = null;
   private element: HTMLElement;
@@ -132,8 +132,8 @@ export class GladiatorStatusView {
     this.attach();
   }
 
-  public update(configFound: boolean, configPath?: string) {
-    if (!configFound) {
+  public update(configPath?: string) {
+    if (!configPath) {
       this._element.style.display = 'none';
     } else {
       this._element.style.display = '';

@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -9,14 +12,17 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const atom_1 = require("atom");
 const atom_languageclient_1 = require("atom-languageclient");
-const fs_1 = require("fs");
+const fs_1 = __importDefault(require("fs"));
 const path = __importStar(require("path"));
+const util_1 = require("util");
+const composed_document_1 = require("./composed-document");
 const cli = __importStar(require("./gladiator-cli-adapter"));
 const gladiator_config_1 = require("./gladiator-config");
 const gladiator_connection_1 = require("./gladiator-connection");
 const server_settings_1 = require("./server-settings");
-const special_document_1 = require("./special-document");
 const ui_1 = __importStar(require("./ui"));
+const exists = util_1.promisify(fs_1.default.exists);
+// @ts-ignore
 class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     constructor() {
         super(...arguments);
@@ -29,7 +35,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         /**
          * Same as `super.startServer()`, but the method is private and doesn't allow
          * any changes to be made. This method is implemented  to set the connection
-         * to `SuperConnection`.
+         * to `GladiatorConnection`.
          */
         this.startServer = async (projectPath) => {
             const process = await this.reportBusyWhile(`Starting ${this.getServerName()} for ${path.basename(projectPath)}`, async () => this.startServerProcess(projectPath));
@@ -89,12 +95,8 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             return newServer;
         };
     }
-    // @ts-ignore
     activate(state) {
         super.activate();
-        if (!cli.isInstalled()) {
-            atom.notifications.addFatalError('gladiator-cli is not installed');
-        }
         this._subscriptions.add(
         /* Registering file watcher related to .gladiator.yml files. */
         atom.project.onDidChangeFiles(events => {
@@ -110,42 +112,42 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         }), atom.commands.add('atom-workspace', {
             'gladiator:pack-problemset': () => {
                 if (this._configPath) {
-                    cli.problemsetPack(this._insertView, path.dirname(this._configPath));
+                    cli.packProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.problemsetPack(this._insertView);
+                    cli.packProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:push-problemset': () => {
                 if (this._configPath) {
-                    cli.problemsetPush(this._insertView, path.dirname(this._configPath));
+                    cli.pushProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.problemsetPush(this._insertView);
+                    cli.pushProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-pack': () => {
                 if (this._configPath) {
-                    cli.dockerImagePack(path.dirname(this._configPath));
+                    cli.packDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.dockerImagePack();
+                    cli.packDockerImage();
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-build': () => {
                 if (this._configPath) {
-                    cli.dockerImageBuild(path.dirname(this._configPath));
+                    cli.buildDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.dockerImageBuild();
+                    cli.buildDockerImage();
                 }
             },
         }));
-        atom.config.set('core.debugLSP', false);
-        if (state.serverSettings) {
+        atom.config.set('core.debugLSP', true);
+        if (state !== undefined && state.serverSettings) {
             this._settings = state.serverSettings;
         }
     }
@@ -185,13 +187,13 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             '--stdio',
         ]);
     }
-    findAndSetConfig() {
+    async findAndSetConfig() {
         const editorPath = atom.workspace.getActiveTextEditor()
             ? atom.workspace.getActiveTextEditor().getPath()
             : null;
         if (!editorPath) {
             /* Nothing is open. */
-            this.unsetValues();
+            await this.unsetValues();
         }
         else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
             return;
@@ -200,41 +202,45 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             this._connection.isRelated(editorPath) &&
             this._configPath) {
             /* Opened an related doc. */
-            if (fs_1.existsSync(this._configPath)) {
-                gladiator_config_1.getConfigValues(this._configPath)
-                    .then(values => this.setValues(values, this._configPath))
-                    .catch(() => this.unsetValues());
+            if (await exists(this._configPath)) {
+                try {
+                    const configValues = await gladiator_config_1.getConfigValues(this._configPath);
+                    await this.setValues(configValues, this._configPath);
+                }
+                catch (_a) {
+                    await this.unsetValues();
+                }
             }
             else {
-                this.findAndSetConfig();
+                await this.findAndSetConfig();
             }
         }
         else if (this._connection) {
-            cli
-                .getConfigFilePath(true)
-                .then(confPath => {
-                gladiator_config_1.getConfigValues(confPath)
-                    .then(values => this.setValues(values, confPath))
-                    .catch(() => this.unsetValues());
-            })
-                .catch(() => this.unsetValues());
+            try {
+                const configPath = await cli.getConfigFilePath(true);
+                const configValues = await gladiator_config_1.getConfigValues(configPath);
+                await this.setValues(configValues, configPath);
+            }
+            catch (_b) {
+                await this.unsetValues();
+            }
         }
         else {
-            this.unsetValues();
+            await this.unsetValues();
         }
     }
-    unsetValues() {
+    async unsetValues() {
         this._configPath = null;
         if (this._statusView) {
-            this._statusView.update(false);
+            this._statusView.update();
         }
         if (this._connection) {
             this._connection.deleteSpecialDocs();
             this._connection.formatSubPath = null;
         }
-        this.sendSettings({});
+        await this.sendSettings({});
     }
-    setValues(values, newPath) {
+    async setValues(values, newPath) {
         if (this._configPath !== newPath) {
             this._configPath = newPath;
             atom.notifications.addSuccess(`Config file set active.`, {
@@ -242,17 +248,17 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             });
         }
         if (this._statusView) {
-            this._statusView.update(true, newPath);
+            this._statusView.update(newPath);
         }
         if (this._connection) {
             this._connection.formatSubPath = path.dirname(newPath);
         }
         this.setFiles(values, newPath);
-        this.sendSettings(values);
+        await this.sendSettings(values);
     }
-    sendSettings(values) {
+    async sendSettings(values) {
         this._settings.settings.yaml.schemas = {};
-        const configSchema = gladiator_config_1.getConfigSchema();
+        const configSchema = await gladiator_config_1.getConfigSchema();
         if (configSchema) {
             this._settings.settings.yaml.schemas[configSchema] = cli.CONFIG_FILE_NAME;
         }
@@ -272,21 +278,22 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         if (this._connection) {
             this._connection.deleteSpecialDocs();
             if (values.problemsetPath) {
-                this._connection.addSpecialDoc(new special_document_1.SpecialDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
+                this._connection.addSpecialDoc(new composed_document_1.ComposedDocument(path.join(path.dirname(configPath), values.problemsetPath)), true);
             }
             if (values.variantsPath) {
-                this._connection.addSpecialDoc(new special_document_1.SpecialDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
+                this._connection.addSpecialDoc(new composed_document_1.ComposedDocument(path.join(path.dirname(configPath), values.variantsPath)), false);
             }
         }
     }
-    updateStatusBar(rootpath) {
-        if (rootpath && this._statusView) {
-            this._statusView.update(true, rootpath);
+    updateStatusBar(rootPath) {
+        if (rootPath && this._statusView) {
+            this._statusView.update(rootPath);
         }
         else if (this._statusView) {
-            this._statusView.update(false);
+            this._statusView.update();
         }
     }
 }
 exports.GladiatorConfClient = GladiatorConfClient;
 module.exports = new GladiatorConfClient();
+//# sourceMappingURL=main.js.map
