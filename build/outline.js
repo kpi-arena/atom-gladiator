@@ -394,3 +394,4 @@ class ScoreOutline {
     }
 }
 exports.ScoreOutline = ScoreOutline;
+//# sourceMappingURL=outline.js.map

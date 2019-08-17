@@ -14,35 +14,44 @@ exports.CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
 exports.CONFIG_FILE_NAME = '.gladiator.yml';
 exports.PROBLEMSET_URL = '/api/v2/utils/schema/problemset-definition';
 exports.VARIANTS_URL = '/api/v2/utils/schema/problemset-variants';
-function isInstalled() {
-    return getProcessPromise([], { silent: true })
-        .then(() => {
+let cliPresenceChecked = false;
+let cliPresent = false;
+async function checkCliPresence() {
+    if (cliPresenceChecked) {
+        return cliPresent;
+    }
+    cliPresenceChecked = true;
+    if (await isInstalled()) {
+        cliPresent = true;
+    }
+    else {
+        atom.notifications.addError('gladiator-cli is not available', {
+            description: 'Please [install Gladiator CLI](http://arena.pages.kpi.fei.tuke.sk/gladiator/gladiator-cli/installation.html).',
+            dismissable: true
+        });
+    }
+    return cliPresent;
+}
+async function isInstalled() {
+    try {
+        await execute([], { silent: true });
         return true;
-    })
-        .catch(() => {
+    }
+    catch (_a) {
         return false;
-    });
+    }
 }
 exports.isInstalled = isInstalled;
-function getSchemaUri() {
-    // return getProcessPromise(['schema', '-u'], { silent: true }).then(value => {
-    //   let newVal = value.replace(/['"]+/g, '');
-    //   newVal = newVal.replace(/\r?\n|\r/, '');
-    //   console.log(JSON.stringify(newVal));
-    //   return newVal;
-    // });
-    return new Promise((resolve, reject) => {
-        const command = 'gladiator';
-        const args = ['files', 'schema', '-u'];
-        const stdout = (data) => resolve(data);
-        const stderr = (data) => reject(data);
-        const process = new atom_1.BufferedProcess({ command, args, stdout, stderr });
-    }).then(value => value.replace(/\r?\n|\r/, ''));
+async function getSchemaUri() {
+    await checkCliPresence();
+    const rawUri = await execute(['files', 'schema', '-u'], { silent: true });
+    return rawUri.replace(/\r?\n|\r/, '');
 }
 exports.getSchemaUri = getSchemaUri;
-function generateFilesToDir(view) {
+async function generateFilesToDir(view) {
+    await checkCliPresence();
     view.getInput('Enter the project directory', util_1.getProjectOrHomePath(), 'Enter the path of the directory in which the files will be generated.', (input) => {
-        getProcessPromise(['files', 'generate', '-d', input], {}).then(() => {
+        execute(['files', 'generate', '-d', input], {}).then(() => {
             atom.open({
                 pathsToOpen: [path.join(input, exports.CONFIG_FILE_NAME)],
             });
@@ -50,23 +59,23 @@ function generateFilesToDir(view) {
     });
 }
 exports.generateFilesToDir = generateFilesToDir;
-function getConfigFilePath(silent) {
+async function getConfigFilePath(silent) {
+    await checkCliPresence();
     const scriptPath = getScriptPath();
     if (!scriptPath) {
-        return new Promise((resolve, reject) => {
-            if (!silent) {
-                noScriptPathWarning();
-            }
-            reject();
-        });
+        if (!silent) {
+            noScriptPathWarning();
+        }
+        return Promise.reject();
     }
-    return getProcessPromise(['files', 'config-path'], {
+    return execute(['files', 'config-path'], {
         scriptPath,
         silent: true,
     });
 }
 exports.getConfigFilePath = getConfigFilePath;
-function packProblemset(view, scriptPath) {
+async function packProblemset(view, scriptPath) {
+    await checkCliPresence();
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -75,20 +84,15 @@ function packProblemset(view, scriptPath) {
         return;
     }
     view.getInput('Name of the package', '', 'Enter the the name of the package without the .zip suffix.', (input) => {
-        if (input.length > 0) {
-            getProcessPromise(['problemset', 'pack', `${input}.zip`], {
-                scriptPath,
-            });
-        }
-        else {
-            getProcessPromise(['problemset', 'pack', `package.zip`], {
-                scriptPath,
-            });
-        }
+        const packageName = input.length > 0 ? `${input}.zip` : 'package.zip';
+        execute(['problemset', 'pack', packageName], {
+            scriptPath,
+        });
     });
 }
 exports.packProblemset = packProblemset;
-function pushProblemset(view, scriptPath) {
+async function pushProblemset(view, scriptPath) {
+    await checkCliPresence();
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -107,12 +111,13 @@ function pushProblemset(view, scriptPath) {
             if (password.length > 0) {
                 args.push('--new-password', password);
             }
-            getProcessPromise(args, { scriptPath });
+            execute(args, { scriptPath });
         });
     });
 }
 exports.pushProblemset = pushProblemset;
-function packDockerImage(scriptPath) {
+async function packDockerImage(scriptPath) {
+    await checkCliPresence();
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -120,10 +125,11 @@ function packDockerImage(scriptPath) {
         noScriptPathWarning();
         return;
     }
-    getProcessPromise(['docker-image', 'pack'], { scriptPath });
+    execute(['docker-image', 'pack'], { scriptPath });
 }
 exports.packDockerImage = packDockerImage;
-function buildDockerImage(scriptPath) {
+async function buildDockerImage(scriptPath) {
+    await checkCliPresence();
     if (!scriptPath) {
         scriptPath = getScriptPath();
     }
@@ -131,11 +137,12 @@ function buildDockerImage(scriptPath) {
         noScriptPathWarning();
         return;
     }
-    getProcessPromise(['docker-image', 'build', '-L'], { scriptPath });
+    execute(['docker-image', 'build', '-L'], { scriptPath });
 }
 exports.buildDockerImage = buildDockerImage;
-function getGladiatorFormat() {
-    return getProcessPromise(['files', 'gladiator-format'], { silent: true });
+async function getGladiatorFormat() {
+    await checkCliPresence();
+    return execute(['files', 'gladiator-format'], { silent: true });
 }
 exports.getGladiatorFormat = getGladiatorFormat;
 function noScriptPathWarning() {
@@ -143,10 +150,11 @@ function noScriptPathWarning() {
         description: `Please open a file (or make an editor active).`,
     });
 }
-function getProcessPromise(args, opt) {
+function execute(args, opt) {
     return new Promise((resolve, reject) => {
         const options = {
             command: 'gladiator',
+            autoStart: false,
             args,
         };
         if (opt.scriptPath) {
@@ -182,15 +190,25 @@ function getProcessPromise(args, opt) {
             }
         };
         const process = new atom_1.BufferedProcess(options);
-        process.onWillThrowError(err => {
+        const handleError = (err) => {
             if (!opt.silent) {
                 atom.notifications.addError('gladiator-cli error', {
-                    description: err.error.message,
-                    stack: err.error.stack,
+                    description: err.message,
+                    stack: err.stack,
                 });
             }
-            reject(err.error.message);
+            reject(err.message);
+        };
+        process.onWillThrowError(err => {
+            err.handle();
+            handleError(err.error);
         });
+        try {
+            process.start();
+        }
+        catch (e) {
+            handleError(e);
+        }
     });
 }
 function getScriptPath() {
@@ -200,3 +218,4 @@ function getScriptPath() {
     }
     return undefined;
 }
+//# sourceMappingURL=gladiator-cli-adapter.js.map

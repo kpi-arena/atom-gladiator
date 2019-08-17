@@ -121,3 +121,4 @@ class GladiatorStatusView {
     }
 }
 exports.GladiatorStatusView = GladiatorStatusView;
+//# sourceMappingURL=ui.js.map

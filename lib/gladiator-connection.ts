@@ -88,7 +88,6 @@ export class GladiatorConnection extends LanguageClientConnection {
     this._versions = new Map();
     this._scoreOutlineDocs = new Map();
   }
-  // @ts-ignore
   public initialize(params: InitializeParams): Promise<InitializeResult> {
     // @ts-ignore
     return super.initialize(params).then(result => {
@@ -140,7 +139,7 @@ export class GladiatorConnection extends LanguageClientConnection {
       return super.willSaveTextDocument(
         (this._docs.get(
           params.textDocument.uri,
-        ) as ComposedDocument).getwillSave(params),
+        ) as ComposedDocument).getWillSave(params),
       );
     } else {
       return super.willSaveTextDocument(params);
@@ -154,7 +153,7 @@ export class GladiatorConnection extends LanguageClientConnection {
       const doc = this._docs.get(params.textDocument.uri) as ComposedDocument;
 
       return super
-        .willSaveWaitUntilTextDocument(doc.getwillSave(params))
+        .willSaveWaitUntilTextDocument(doc.getWillSave(params))
         .then(value => {
           if (!value) {
             return value;

@@ -3,8 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const yaml_ast_parser_1 = require("yaml-ast-parser");
 const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
-let configSchema = null;
-function getConfigValues(path) {
+let configSchemaCache = null;
+async function getConfigValues(path) {
     return new Promise((resolve, reject) => {
         fs_1.readFile(path, 'utf8', (err, data) => {
             if (err) {
@@ -17,17 +17,16 @@ function getConfigValues(path) {
     });
 }
 exports.getConfigValues = getConfigValues;
-function getConfigSchema() {
-    if (!configSchema) {
-        gladiator_cli_adapter_1.getSchemaUri()
-            .then(value => {
-            configSchema = value;
-        })
-            .catch(() => {
-            configSchema = null;
-        });
+async function getConfigSchema() {
+    if (configSchemaCache === null) {
+        try {
+            configSchemaCache = await gladiator_cli_adapter_1.getSchemaUri();
+        }
+        catch (_a) {
+            configSchemaCache = null;
+        }
     }
-    return configSchema;
+    return configSchemaCache;
 }
 exports.getConfigSchema = getConfigSchema;
 function readConfigValues(node) {
@@ -74,3 +73,4 @@ function getStringValue(node) {
         return null;
     }
 }
+//# sourceMappingURL=gladiator-config.js.map

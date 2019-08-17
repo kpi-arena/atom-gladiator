@@ -55,7 +55,6 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         this._versions = new Map();
         this._scoreOutlineDocs = new Map();
     }
-    // @ts-ignore
     initialize(params) {
         // @ts-ignore
         return super.initialize(params).then(result => {
@@ -93,7 +92,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
     }
     willSaveTextDocument(params) {
         if (this._docs.has(params.textDocument.uri)) {
-            return super.willSaveTextDocument(this._docs.get(params.textDocument.uri).getwillSave(params));
+            return super.willSaveTextDocument(this._docs.get(params.textDocument.uri).getWillSave(params));
         }
         else {
             return super.willSaveTextDocument(params);
@@ -103,7 +102,7 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
         if (this._docs.has(params.textDocument.uri)) {
             const doc = this._docs.get(params.textDocument.uri);
             return super
-                .willSaveWaitUntilTextDocument(doc.getwillSave(params))
+                .willSaveWaitUntilTextDocument(doc.getWillSave(params))
                 .then(value => {
                 if (!value) {
                     return value;
@@ -211,3 +210,4 @@ class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection
     }
 }
 exports.GladiatorConnection = GladiatorConnection;
+//# sourceMappingURL=gladiator-connection.js.map

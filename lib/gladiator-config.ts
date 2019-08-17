@@ -12,7 +12,7 @@ import {
   VARIANTS_URL,
 } from './gladiator-cli-adapter';
 
-let configSchema: string | null = null;
+let configSchemaCache: string | null = null;
 
 export interface IConfigValues {
   apiUrl?: string;
@@ -22,7 +22,7 @@ export interface IConfigValues {
   variantSchema?: string;
 }
 
-export function getConfigValues(path: string): Promise<IConfigValues> {
+export async function getConfigValues(path: string): Promise<IConfigValues> {
   return new Promise<IConfigValues>((resolve, reject) => {
     readFile(path, 'utf8', (err, data) => {
       if (err) {
@@ -34,18 +34,16 @@ export function getConfigValues(path: string): Promise<IConfigValues> {
   });
 }
 
-export function getConfigSchema(): string | null {
-  if (!configSchema) {
-    getSchemaUri()
-      .then(value => {
-        configSchema = value;
-      })
-      .catch(() => {
-        configSchema = null;
-      });
+export async function getConfigSchema(): Promise<string | null> {
+  if (configSchemaCache === null) {
+    try {
+      configSchemaCache = await getSchemaUri();
+    } catch {
+      configSchemaCache = null;
+    }
   }
 
-  return configSchema;
+  return configSchemaCache;
 }
 
 function readConfigValues(node: YAMLNode): IConfigValues {
