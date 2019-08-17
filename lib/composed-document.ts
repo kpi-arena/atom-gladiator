@@ -47,9 +47,9 @@ export interface ILinesRelation {
   /* Path of the original document. */
   originPath: string;
 
-  /* Global length of indendation of the original document, not just related
+  /* Global length of indentation of the original document, not just related
   to it's parent documents. */
-  intendationLength: number;
+  indentationLength: number;
 }
 
 export class ComposedDocument {
@@ -118,7 +118,7 @@ export class ComposedDocument {
     };
   }
 
-  public getwillSave(
+  public getWillSave(
     params: WillSaveTextDocumentParams,
   ): WillSaveTextDocumentParams {
     return {
@@ -190,7 +190,7 @@ export class ComposedDocument {
       for (const item of lineRelation) {
         if (item.originUri === params.textDocument.uri) {
           params.position.line = item.newLine;
-          params.position.character += item.intendationLength;
+          params.position.character += item.indentationLength;
           params.textDocument.uri = Convert.pathToUri(this._rootPath);
           return params;
         }
@@ -310,11 +310,11 @@ export class ComposedDocument {
     return {
       start: {
         line: startRelation.originLine,
-        character: superRange.start.character - startRelation.intendationLength,
+        character: superRange.start.character - startRelation.indentationLength,
       },
       end: {
         line: endRelation.originLine,
-        character: superRange.end.character - endRelation.intendationLength,
+        character: superRange.end.character - endRelation.indentationLength,
       },
     };
   }
@@ -382,7 +382,7 @@ export class ComposedDocument {
         originLine: index,
         originUri: Convert.pathToUri(docPath),
         originPath: docPath,
-        intendationLength: intendation.length,
+        indentationLength: intendation.length,
       };
 
       if (this._oldToNew.has(index)) {
