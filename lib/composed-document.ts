@@ -23,6 +23,14 @@ import {
 } from './util';
 
 /**
+ * PublishDiagnosticsParams include version since version 3.15 of LSP.
+ * However atom-languageclient uses LSP in version 3.12. To prevent issues with
+ * different type definitions between these versions, project uses version 3.12
+ * and here we define our own modified type that allow to include version property.
+ */
+type VersionedPublishDiagnosticsParams = PublishDiagnosticsParams & { version?: number };
+
+/**
  * Represents relation between an original line in document given by URI and
  * new line in the super document. Intendation
  */
@@ -200,9 +208,9 @@ export class ComposedDocument {
    * @param params - all diagnostics for a super document.
    */
   public filterDiagnostics(
-    params: PublishDiagnosticsParams,
-  ): Map<string, PublishDiagnosticsParams> {
-    const result: Map<string, PublishDiagnosticsParams> = new Map();
+    params: VersionedPublishDiagnosticsParams,
+  ): Map<string, VersionedPublishDiagnosticsParams> {
+    const result: Map<string, VersionedPublishDiagnosticsParams> = new Map();
 
     /* Initialize Map for each related subdocument with it's relatedUri as a
     key. Skipping this steps results in Diagnostics not clearing from editor
@@ -223,7 +231,7 @@ export class ComposedDocument {
       are transformed to correspond with the original document's positions. */
       (result.get(
         startRelation.originUri,
-      ) as PublishDiagnosticsParams).diagnostics.push({
+      ) as VersionedPublishDiagnosticsParams).diagnostics.push({
         code: diagnose.code,
         message: diagnose.message,
         range: this.transformRange(diagnose.range),
