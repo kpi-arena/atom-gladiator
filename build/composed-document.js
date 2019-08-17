@@ -301,9 +301,9 @@ class ComposedDocument {
         return newContent;
     }
     /**
-     * Gets the indendation in front of `#` character and returns it.
+     * Gets the indentation in front of `#` character and returns it.
      *
-     * @param line - line contaiting `#include` comment with indentation.
+     * @param line - line containing `#include` comment with indentation.
      */
     getCommentIndentation(line) {
         let result = '';
