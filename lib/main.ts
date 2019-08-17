@@ -5,6 +5,7 @@ import {
   ConnectionType,
   LanguageServerProcess,
 } from 'atom-languageclient';
+import { install as installDependencies } from 'atom-package-deps';
 import fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
@@ -31,8 +32,10 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _insertView = new CommandPaletteView();
   private _statusView: GladiatorStatusView | null = null;
 
-  public activate(state?: IClientState) {
+  public async activate(state?: IClientState) {
     super.activate();
+
+    await installDependencies('gladiator', false);
 
     this._subscriptions.add(
       /* Registering file watcher related to .gladiator.yml files. */
@@ -100,7 +103,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       }),
     );
 
-    atom.config.set('core.debugLSP', true);
+    atom.config.set('core.debugLSP', false);
 
     if (state !== undefined && state.serverSettings) {
       this._settings = state.serverSettings;

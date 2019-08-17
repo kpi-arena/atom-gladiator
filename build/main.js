@@ -12,6 +12,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const atom_1 = require("atom");
 const atom_languageclient_1 = require("atom-languageclient");
+const atom_package_deps_1 = require("atom-package-deps");
 const fs_1 = __importDefault(require("fs"));
 const path = __importStar(require("path"));
 const util_1 = require("util");
@@ -95,8 +96,9 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             return newServer;
         };
     }
-    activate(state) {
+    async activate(state) {
         super.activate();
+        await atom_package_deps_1.install('gladiator', false);
         this._subscriptions.add(
         /* Registering file watcher related to .gladiator.yml files. */
         atom.project.onDidChangeFiles(events => {
@@ -146,7 +148,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
                 }
             },
         }));
-        atom.config.set('core.debugLSP', true);
+        atom.config.set('core.debugLSP', false);
         if (state !== undefined && state.serverSettings) {
             this._settings = state.serverSettings;
         }
