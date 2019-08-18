@@ -42,6 +42,10 @@ class SchemaNode {
   private _validateScalars: boolean = false;
 
   constructor(node: YAMLNode) {
+    if (node.kind === Kind.ANCHOR_REF) {
+      node = node.value;
+    }
+
     this._kind = node.kind;
 
     this._key = node.key ? (node.key as YAMLNode).value : null;
