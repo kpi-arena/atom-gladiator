@@ -39,6 +39,11 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     this._subscriptions.add(
       /* Registering file watcher related to .gladiator.yml files. */
+
+      atom.workspace.onDidOpen(() => {
+        this.findAndSetConfig();
+      }),
+
       atom.project.onDidChangeFiles(events => {
         for (const event of events) {
           if (event.path.match(cli.CONFIG_FILE_REGEX)) {
