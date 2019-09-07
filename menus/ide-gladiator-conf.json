@@ -25,6 +25,14 @@
             {
               "label": "Build docker image",
               "command": "gladiator:docker-image-build"
+            },
+            {
+              "label": "Pack test submission",
+              "command": "gladiator:submission-pack"
+            },
+            {
+              "label": "Submit test submission",
+              "command": "gladiator:submission-submit"
             }
           ]
         }

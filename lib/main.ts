@@ -118,6 +118,26 @@ export class GladiatorConfClient extends AutoLanguageClient {
           }
         },
       }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:submission-pack': () => {
+          if (this._configPath) {
+            this.cli.packSubmission(path.dirname(this._configPath));
+          } else {
+            this.cli.packSubmission();
+          }
+        }
+      }),
+
+      atom.commands.add('atom-workspace', {
+        'gladiator:submission-submit': () => {
+          if (this._configPath) {
+            this.cli.submitSubmission(path.dirname(this._configPath));
+          } else {
+            this.cli.submitSubmission();
+          }
+        }
+      }),
     );
 
     atom.config.set('core.debugLSP', false);

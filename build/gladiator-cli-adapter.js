@@ -125,6 +125,26 @@ class GladiatorCliAdapter {
         }
         this.execute(['docker-image', 'build'], { scriptPath });
     }
+    async packSubmission(scriptPath) {
+        await this.checkCliPresence();
+        if (!scriptPath) {
+            scriptPath = getScriptPath();
+        }
+        if (!scriptPath) {
+            return noScriptPathWarning();
+        }
+        this.execute(['submission', 'pack'], { scriptPath });
+    }
+    async submitSubmission(scriptPath) {
+        await this.checkCliPresence();
+        if (!scriptPath) {
+            scriptPath = getScriptPath();
+        }
+        if (!scriptPath) {
+            return noScriptPathWarning();
+        }
+        this.execute(['submission', 'submit'], { scriptPath });
+    }
     async getGladiatorFormat() {
         if (this.formatCache === null) {
             await this.checkCliPresence();
