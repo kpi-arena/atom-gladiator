@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const yaml_ast_parser_1 = require("yaml-ast-parser");
 const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
-let configSchemaCache = null;
 async function getConfigValues(path) {
     return new Promise((resolve, reject) => {
         fs_1.readFile(path, 'utf8', (err, data) => {
@@ -17,18 +16,6 @@ async function getConfigValues(path) {
     });
 }
 exports.getConfigValues = getConfigValues;
-async function getConfigSchema() {
-    if (configSchemaCache === null) {
-        try {
-            configSchemaCache = await gladiator_cli_adapter_1.getSchemaUri();
-        }
-        catch (_a) {
-            configSchemaCache = null;
-        }
-    }
-    return configSchemaCache;
-}
-exports.getConfigSchema = getConfigSchema;
 function readConfigValues(node) {
     const result = {};
     const apiUrl = getValueFromKey(node, 'api-url');

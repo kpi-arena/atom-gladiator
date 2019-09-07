@@ -3,25 +3,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const atom_languageclient_1 = require("atom-languageclient");
 const path_1 = require("path");
 const yaml_ast_parser_1 = require("yaml-ast-parser");
+const composed_document_1 = require("./composed-document");
 const format_schema_1 = require("./format-schema");
 const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
 const outline_1 = require("./outline");
-const composed_document_1 = require("./composed-document");
 const util_1 = require("./util");
 class GladiatorConnection extends atom_languageclient_1.LanguageClientConnection {
-    constructor(rpc, logger) {
+    constructor(rpc, format, logger) {
         super(rpc, logger);
         this._docs = new Map();
         this._versions = new Map();
         this._format = null;
         this._scoreOutlineDocs = new Map();
-        gladiator_cli_adapter_1.getGladiatorFormat()
-            .then(value => {
-            this._format = new format_schema_1.FormatValidation(yaml_ast_parser_1.safeLoad(value));
-        })
-            .catch(() => {
-            this._format = null;
-        });
+        this._format = new format_schema_1.FormatValidation(yaml_ast_parser_1.safeLoad(format));
     }
     addSpecialDoc(doc, hasScore) {
         doc.relatedUris.forEach(relatedUri => {

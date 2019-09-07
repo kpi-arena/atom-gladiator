@@ -1,193 +1,177 @@
 import { BufferedProcess, ProcessOptions } from 'atom';
 import * as path from 'path';
+import { ConsoleProvider } from './main';
 import CommandPaletteView from './ui';
 import { getProjectOrHomePath } from './util';
 
-export const CONFIG_FILE_REGEX = /(\\|\/)\.gladiator\.(yml)$/;
+export const CONFIG_FILE_REGEX = /([\\/])\.gladiator\.(yml)$/;
 export const CONFIG_FILE_NAME = '.gladiator.yml';
 export const PROBLEMSET_URL = '/api/v2/utils/schema/problemset-definition';
 export const VARIANTS_URL = '/api/v2/utils/schema/problemset-variants';
 
-let cliPresenceChecked = false;
-let cliPresent = false;
+export class GladiatorCliAdapter {
+  private cliPresent: boolean | undefined;
 
-async function checkCliPresence(): Promise<boolean> {
-  if (cliPresenceChecked) {
-    return cliPresent;
+  private schemaUriCache: string | null = null;
+  private formatCache: string | null = null;
+
+  constructor(private readonly getConsole: ConsoleProvider) {}
+
+  public async getSchemaUri(): Promise<string> {
+    if (this.schemaUriCache === null) {
+      await this.checkCliPresence();
+      const rawUri = await this.execute(['files', 'schema', '-u'], { silent: true });
+      this.schemaUriCache = rawUri.replace(/\r?\n|\r/, '');
+    }
+    return this.schemaUriCache;
   }
-  cliPresenceChecked = true;
-  if (await isInstalled()) {
-    cliPresent = true;
-  } else {
-    atom.notifications.addError('gladiator-cli is not available', {
-      description: 'Please [install Gladiator CLI](http://arena.pages.kpi.fei.tuke.sk/gladiator/gladiator-cli/installation.html).',
-      dismissable: true
+
+  public async generateFilesToDir(view: CommandPaletteView) {
+    await this.checkCliPresence();
+    const input = await view.getInput(
+      'Enter the project directory',
+      getProjectOrHomePath(),
+      'Enter the path of the directory in which the files will be generated.'
+    );
+    if (input === null) {
+      return;
+    }
+
+    this.execute(['files', 'generate', '-d', input], {}).then(() => {
+      atom.open({
+        pathsToOpen: [path.join(input, CONFIG_FILE_NAME)],
+      });
     });
   }
-  return cliPresent;
-}
 
-export async function isInstalled(): Promise<boolean> {
-  try {
-    await execute([], { silent: true });
-    return true;
-  } catch {
-    return false;
-  }
-}
+  public async getConfigFilePath(silent: boolean): Promise<string> {
+    await this.checkCliPresence();
+    const scriptPath = getScriptPath();
 
-export async function getSchemaUri(): Promise<string> {
-  await checkCliPresence();
-  const rawUri = await execute(['files', 'schema', '-u'], { silent: true });
-  return rawUri.replace(/\r?\n|\r/, '');
-}
-
-export async function generateFilesToDir(view: CommandPaletteView) {
-  await checkCliPresence();
-  view.getInput(
-    'Enter the project directory',
-    getProjectOrHomePath(),
-    'Enter the path of the directory in which the files will be generated.',
-    (input: string) => {
-      execute(['files', 'generate', '-d', input], {}).then(() => {
-        atom.open({
-          pathsToOpen: [path.join(input, CONFIG_FILE_NAME)],
-        });
-      });
-    },
-  );
-}
-
-export async function getConfigFilePath(silent: boolean): Promise<string> {
-  await checkCliPresence();
-  const scriptPath = getScriptPath();
-
-  if (!scriptPath) {
-    if (!silent) {
-      noScriptPathWarning();
+    if (!scriptPath) {
+      if (!silent) {
+        noScriptPathWarning();
+      }
+      return Promise.reject();
     }
-    return Promise.reject();
+
+    return this.execute(['files', 'config-path'], {
+      scriptPath,
+      silent: true,
+    });
   }
 
-  return execute(['files', 'config-path'], {
-    scriptPath,
-    silent: true,
-  });
-}
+  public async packProblemset(view: CommandPaletteView, scriptPath?: string) {
+    await this.checkCliPresence();
+    if (!scriptPath) {
+      scriptPath = getScriptPath();
+    }
 
-export async function packProblemset(view: CommandPaletteView, scriptPath?: string) {
-  await checkCliPresence();
-  if (!scriptPath) {
-    scriptPath = getScriptPath();
+    if (!scriptPath) {
+      noScriptPathWarning();
+      return;
+    }
+
+    const input = await view.getInput(
+      'Name of the package',
+      '',
+      'Enter the the name of the package without the .zip suffix.'
+    );
+
+    if (input === null) {
+      return;
+    }
+
+    const packageName = input.length > 0 ? `${input}.zip` : 'package.zip';
+    this.execute(['problemset', 'pack', packageName], {
+      scriptPath,
+    });
   }
 
-  if (!scriptPath) {
-    noScriptPathWarning();
-    return;
+  public async pushProblemset(view: CommandPaletteView, scriptPath?: string) {
+    await this.checkCliPresence();
+    if (!scriptPath) {
+      scriptPath = getScriptPath();
+    }
+
+    if (!scriptPath) {
+      noScriptPathWarning();
+      return;
+    }
+
+    const args = ['problemset', 'push'];
+
+    // const pid = await view.getInput(
+    //   'Problemset PID',
+    //   '',
+    //   'Specify PID to be used for the problemset.'
+    // );
+    //
+    // if (pid) {
+    //   args.push('-p', pid);
+    // }
+    //
+    // const newPassword = await view.getInput(
+    //   'New password',
+    //   '',
+    //   'Changes the current master password.'
+    // );
+    //
+    // if (newPassword) {
+    //   args.push('--new-password', newPassword);
+    // }
+
+    this.execute(args, { scriptPath });
   }
 
-  view.getInput(
-    'Name of the package',
-    '',
-    'Enter the the name of the package without the .zip suffix.',
-    (input: string) => {
-      const packageName = input.length > 0 ? `${input}.zip` : 'package.zip';
-      execute(['problemset', 'pack', packageName], {
-        scriptPath,
-      });
-    },
-  );
-}
+  public async packDockerImage(scriptPath?: string) {
+    await this.checkCliPresence();
+    if (!scriptPath) {
+      scriptPath = getScriptPath();
+    }
 
-export async function pushProblemset(view: CommandPaletteView, scriptPath?: string) {
-  await checkCliPresence();
-  if (!scriptPath) {
-    scriptPath = getScriptPath();
+    if (!scriptPath) {
+      noScriptPathWarning();
+      return;
+    }
+
+    this.execute(['docker-image', 'pack'], { scriptPath });
   }
 
-  if (!scriptPath) {
-    noScriptPathWarning();
-    return;
+  public async buildDockerImage(scriptPath?: string) {
+    await this.checkCliPresence();
+    if (!scriptPath) {
+      scriptPath = getScriptPath();
+    }
+
+    if (!scriptPath) {
+      noScriptPathWarning();
+      return;
+    }
+
+    this.execute(['docker-image', 'build'], { scriptPath });
   }
 
-  let pid: string = '';
-
-  view.getInput(
-    'Problemset PID',
-    '',
-    'Specify PID to be used for the problemset.',
-    (pidInput: string) => {
-      pid = pidInput;
-      view.getInput(
-        'New password',
-        '',
-        'Changes the current master password.',
-        (password: string) => {
-          const args = ['problemset', 'push'];
-
-          if (pid.length > 0) {
-            args.push('-p', pid);
-          }
-
-          if (password.length > 0) {
-            args.push('--new-password', password);
-          }
-          execute(args, { scriptPath });
-        },
-      );
-    },
-  );
-}
-
-export async function packDockerImage(scriptPath?: string) {
-  await checkCliPresence();
-  if (!scriptPath) {
-    scriptPath = getScriptPath();
+  public async getGladiatorFormat(): Promise<string> {
+    if (this.formatCache === null) {
+      await this.checkCliPresence();
+      this.formatCache = await this.execute(['files', 'gladiator-format'], { silent: true });
+    }
+    return this.formatCache;
   }
 
-  if (!scriptPath) {
-    noScriptPathWarning();
-    return;
-  }
+  private async execute(
+    args: string[],
+    opt: IProcessOptions,
+  ): Promise<string> {
+    const atomConsole = this.getConsole();
 
-  execute(['docker-image', 'pack'], { scriptPath });
-}
+    if (!opt.silent && atomConsole !== null) {
+      atomConsole.clear();
+      atomConsole.stickBottom();
+      atomConsole.notice('$ gladiator ' + args.join(' '));
+    }
 
-export async function buildDockerImage(scriptPath?: string) {
-  await checkCliPresence();
-  if (!scriptPath) {
-    scriptPath = getScriptPath();
-  }
-
-  if (!scriptPath) {
-    noScriptPathWarning();
-    return;
-  }
-
-  execute(['docker-image', 'build', '-L'], { scriptPath });
-}
-
-export async function getGladiatorFormat() {
-  await checkCliPresence();
-  return execute(['files', 'gladiator-format'], { silent: true });
-}
-
-function noScriptPathWarning(): void {
-  atom.notifications.addError(`Can't determine where to look for file`, {
-    description: `Please open a file (or make an editor active).`,
-  });
-}
-
-interface IProcessOptions {
-  scriptPath?: string;
-  silent?: boolean;
-}
-
-function execute(
-  args: string[],
-  opt: IProcessOptions,
-): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
     const options: ProcessOptions = {
       command: 'gladiator',
       autoStart: false,
@@ -198,65 +182,91 @@ function execute(
       options.options = { cwd: opt.scriptPath };
     }
 
-    let message: string = '';
+    return new Promise<string>((resolve, reject) => {
+      let message: string = '';
 
-    options.stdout = (data: string): void => {
-      message = message.concat(data, '\n');
+      options.stdout = (data: string): void => {
+        message = message.concat(data, '\n');
 
-      // atom.notifications.addSuccess(data);
-
-      // resolve(data);
-    };
-
-    options.stderr = (data: string): void => {
-      message = message.concat(data, '\n');
-      // atom.notifications.addError(data);
-
-      // reject(data);
-    };
-
-    options.exit = (code: number): void => {
-      if (code === 0) {
-        if (!opt.silent) {
-          atom.notifications.addSuccess('Success', {
-            detail: message,
-          });
+        if (!opt.silent && atomConsole !== null) {
+          atomConsole.raw(data, 'info', '\n');
         }
+      };
 
-        resolve(message.trim());
-      } else {
-        if (!opt.silent) {
-          atom.notifications.addError('gladiator-cli error', {
-            description: message,
-          });
+      options.stderr = (data: string): void => {
+        message = message.concat(data, '\n');
+
+        if (!opt.silent && atomConsole !== null) {
+          atomConsole.raw(data, 'error', '\n');
         }
-        reject(message.trim());
+      };
+
+      options.exit = (code: number): void => {
+        if (code === 0) {
+          resolve(message.trim());
+        } else {
+          reject(message.trim());
+        }
+      };
+
+      const process = new BufferedProcess(options);
+
+      const handleError = (err: Error) => {
+        if (!opt.silent && atomConsole !== null) {
+          atomConsole.raw(err.message, 'error', '\n');
+        }
+        reject(err.message);
+      };
+
+      process.onWillThrowError(err => {
+        err.handle();
+        handleError(err.error);
+      });
+
+      try {
+        process.start();
+      } catch (e) {
+        handleError(e);
       }
-    };
+    });
+  }
 
-    const process = new BufferedProcess(options);
-
-    const handleError = (err: Error) => {
-      if (!opt.silent) {
-        atom.notifications.addError('gladiator-cli error', {
-          description: err.message,
-          stack: err.stack,
+  private async checkCliPresence(): Promise<boolean> {
+    if (this.cliPresent === undefined) {
+      if (await this.isInstalled()) {
+        this.cliPresent = true;
+      } else {
+        this.cliPresent = false;
+        atom.notifications.addError('gladiator-cli is not available', {
+          description: 'Please [install Gladiator CLI](http://arena.pages.kpi.fei.tuke.sk/gladiator/gladiator-cli/installation.html).',
+          dismissable: true
         });
       }
-      reject(err.message);
-    };
-
-    process.onWillThrowError(err => {
-      err.handle();
-      handleError(err.error);
-    });
-
-    try {
-      process.start();
-    } catch (e) {
-      handleError(e);
     }
+
+    return this.cliPresent;
+  }
+
+  private async isInstalled(): Promise<boolean> {
+    try {
+      await this.execute([], { silent: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+
+function noScriptPathWarning(): void {
+  atom.notifications.addError(`Can't determine where to look for file`, {
+    description: `Please open a file (or make an editor active).`,
   });
+}
+
+interface IProcessOptions {
+  scriptPath?: string;
+  silent?: boolean;
 }
 
 function getScriptPath(): string | undefined {

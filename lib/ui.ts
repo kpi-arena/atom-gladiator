@@ -69,24 +69,29 @@ export default class CommandPaletteView {
     atom.views.getView(atom.workspace).focus();
   }
 
-  public getInput(
+  public async getInput(
     placeholderText: string,
     showText: string,
-    description: string,
-    callback: (text: string) => void,
-  ) {
+    description: string
+  ): Promise<string | null> {
     if (this.panel.isVisible()) {
-      return;
+      return Promise.resolve(null);
     }
-    this.callback = callback;
+
     this.content = '';
+    this.message.textContent = description;
     this.miniEditor.setText(showText);
     this.miniEditor.setPlaceholderText(placeholderText);
     this.storeFocusedElement();
     this.panel.show();
-    this.message.textContent = description;
     // @ts-ignore
     this.getMiniEditorElement().focus();
+
+    return new Promise((resolve, reject) => {
+      this.callback = text => {
+        resolve(text);
+      };
+    });
   }
 
   // Returns an object that can be retrieved when package is activated

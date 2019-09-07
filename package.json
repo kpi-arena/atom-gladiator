@@ -46,6 +46,11 @@
         "2.0.0": "consumeLinterV2"
       }
     },
+    "console-panel": {
+      "versions": {
+        "^1.0.0": "consumeConsolePanel"
+      }
+    },
     "datatip": {
       "versions": {
         "0.1.0": "consumeDatatip"
@@ -85,6 +90,7 @@
     }
   },
   "package-deps": [
-    "atom-ide-ui"
+    "atom-ide-ui",
+    "console-panel"
   ]
 }

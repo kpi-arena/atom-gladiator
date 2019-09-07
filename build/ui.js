@@ -53,19 +53,23 @@ class CommandPaletteView {
         }
         atom.views.getView(atom.workspace).focus();
     }
-    getInput(placeholderText, showText, description, callback) {
+    async getInput(placeholderText, showText, description) {
         if (this.panel.isVisible()) {
-            return;
+            return Promise.resolve(null);
         }
-        this.callback = callback;
         this.content = '';
+        this.message.textContent = description;
         this.miniEditor.setText(showText);
         this.miniEditor.setPlaceholderText(placeholderText);
         this.storeFocusedElement();
         this.panel.show();
-        this.message.textContent = description;
         // @ts-ignore
         this.getMiniEditorElement().focus();
+        return new Promise((resolve, reject) => {
+            this.callback = text => {
+                resolve(text);
+            };
+        });
     }
     // Returns an object that can be retrieved when package is activated
     serialize() { }

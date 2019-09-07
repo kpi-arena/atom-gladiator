@@ -35,6 +35,9 @@ class SchemaNode {
         this._mappings = new Map();
         this._items = [];
         this._validateScalars = false;
+        if (node.kind === yaml_ast_parser_1.Kind.ANCHOR_REF) {
+            node = node.value;
+        }
         this._kind = node.kind;
         this._key = node.key ? node.key.value : null;
         this._value =

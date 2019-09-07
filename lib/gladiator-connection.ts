@@ -23,10 +23,10 @@ import {
   WillSaveTextDocumentParams,
 } from 'vscode-languageserver-protocol';
 import { safeLoad } from 'yaml-ast-parser';
-import { FormatValidation } from './format-schema';
-import { CONFIG_FILE_REGEX, getGladiatorFormat } from './gladiator-cli-adapter';
-import { ScoreOutline, SingleFileOutline } from './outline';
 import { ComposedDocument } from './composed-document';
+import { FormatValidation } from './format-schema';
+import { CONFIG_FILE_REGEX } from './gladiator-cli-adapter';
+import { ScoreOutline, SingleFileOutline } from './outline';
 import { getOpenYAMLDocuments } from './util';
 
 export class GladiatorConnection extends LanguageClientConnection {
@@ -35,16 +35,9 @@ export class GladiatorConnection extends LanguageClientConnection {
   private _format: FormatValidation | null = null;
   private _scoreOutlineDocs: Map<string, ScoreOutline | null> = new Map();
 
-  constructor(rpc: MessageConnection, logger?: Logger) {
+  constructor(rpc: MessageConnection, format: string, logger?: Logger) {
     super(rpc, logger);
-
-    getGladiatorFormat()
-      .then(value => {
-        this._format = new FormatValidation(safeLoad(value));
-      })
-      .catch(() => {
-        this._format = null;
-      });
+    this._format = new FormatValidation(safeLoad(format));
   }
 
   public addSpecialDoc(doc: ComposedDocument, hasScore: boolean) {

@@ -6,14 +6,14 @@ import {
   LanguageServerProcess,
 } from 'atom-languageclient';
 import { install as installDependencies } from 'atom-package-deps';
+import { ConsoleManager } from 'console-panel';
 import fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
 import { IClientState } from './client-state';
 import { ComposedDocument } from './composed-document';
-import * as cli from './gladiator-cli-adapter';
+import { CONFIG_FILE_NAME, CONFIG_FILE_REGEX, GladiatorCliAdapter } from './gladiator-cli-adapter';
 import {
-  getConfigSchema,
   getConfigValues,
   IConfigValues,
 } from './gladiator-config';
@@ -23,6 +23,8 @@ import CommandPaletteView, { GladiatorStatusView } from './ui';
 
 const exists = promisify(fs.exists);
 
+export type ConsoleProvider = () => ConsoleManager | null;
+
 // @ts-ignore
 export class GladiatorConfClient extends AutoLanguageClient {
   private _connection: GladiatorConnection | null = null;
@@ -31,6 +33,14 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private _subscriptions = new CompositeDisposable();
   private _insertView = new CommandPaletteView();
   private _statusView: GladiatorStatusView | null = null;
+  private _console: ConsoleManager | null = null;
+
+  private cli: GladiatorCliAdapter;
+
+  constructor() {
+    super();
+    this.cli = new GladiatorCliAdapter(this.consoleDelegate);
+  }
 
   public async activate(state?: IClientState) {
     super.activate();
@@ -40,13 +50,15 @@ export class GladiatorConfClient extends AutoLanguageClient {
     this._subscriptions.add(
       /* Registering file watcher related to .gladiator.yml files. */
 
-      atom.workspace.onDidOpen(() => {
-        this.findAndSetConfig();
+      atom.workspace.onDidOpen(event => {
+        if (event.uri) {
+          this.findAndSetConfig();
+        }
       }),
 
       atom.project.onDidChangeFiles(events => {
         for (const event of events) {
-          if (event.path.match(cli.CONFIG_FILE_REGEX)) {
+          if (event.path.match(CONFIG_FILE_REGEX)) {
             this.findAndSetConfig();
           }
         }
@@ -58,18 +70,18 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
       atom.commands.add('atom-workspace', {
         'gladiator:generate-files': () =>
-          cli.generateFilesToDir(this._insertView),
+          this.cli.generateFilesToDir(this._insertView),
       }),
 
       atom.commands.add('atom-workspace', {
-        'gladiator:pack-problemset': () => {
+        'gladiator:pack-problemset': async () => {
           if (this._configPath) {
-            cli.packProblemset(
+            await this.cli.packProblemset(
               this._insertView,
               path.dirname(this._configPath),
             );
           } else {
-            cli.packProblemset(this._insertView);
+            await this.cli.packProblemset(this._insertView);
           }
         },
       }),
@@ -77,12 +89,12 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:push-problemset': () => {
           if (this._configPath) {
-            cli.pushProblemset(
+            this.cli.pushProblemset(
               this._insertView,
               path.dirname(this._configPath),
             );
           } else {
-            cli.pushProblemset(this._insertView);
+            this.cli.pushProblemset(this._insertView);
           }
         },
       }),
@@ -90,9 +102,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:docker-image-pack': () => {
           if (this._configPath) {
-            cli.packDockerImage(path.dirname(this._configPath));
+            this.cli.packDockerImage(path.dirname(this._configPath));
           } else {
-            cli.packDockerImage();
+            this.cli.packDockerImage();
           }
         },
       }),
@@ -100,9 +112,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
       atom.commands.add('atom-workspace', {
         'gladiator:docker-image-build': () => {
           if (this._configPath) {
-            cli.buildDockerImage(path.dirname(this._configPath));
+            this.cli.buildDockerImage(path.dirname(this._configPath));
           } else {
-            cli.buildDockerImage();
+            this.cli.buildDockerImage();
           }
         },
       }),
@@ -118,6 +130,10 @@ export class GladiatorConfClient extends AutoLanguageClient {
   public consumeStatusBar(statusBar: any) {
     this._statusView = new GladiatorStatusView(statusBar);
     this.updateStatusBar();
+  }
+
+  public consumeConsolePanel(consolePanel: ConsoleManager) {
+    this._console = consolePanel;
   }
 
   public serialize(): IClientState {
@@ -174,7 +190,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     if (!editorPath) {
       /* Nothing is open. */
       await this.unsetValues();
-    } else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+    } else if (!editorPath.match(CONFIG_FILE_REGEX)) {
       return;
     } else if (
       this._connection &&
@@ -194,7 +210,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
       }
     } else if (this._connection) {
       try {
-        const configPath = await cli.getConfigFilePath(true);
+        const configPath = await this.cli.getConfigFilePath(true);
         const configValues = await getConfigValues(configPath);
         await this.setValues(configValues, configPath);
       } catch {
@@ -244,9 +260,9 @@ export class GladiatorConfClient extends AutoLanguageClient {
   private async sendSettings(values: IConfigValues) {
     this._settings.settings.yaml.schemas = {};
 
-    const configSchema = await getConfigSchema();
+    const configSchema = await this.cli.getSchemaUri();
     if (configSchema) {
-      this._settings.settings.yaml.schemas[configSchema] = cli.CONFIG_FILE_NAME;
+      this._settings.settings.yaml.schemas[configSchema] = CONFIG_FILE_NAME;
     }
 
     if (values.problemsetSchema && values.problemsetPath) {
@@ -296,6 +312,8 @@ export class GladiatorConfClient extends AutoLanguageClient {
     }
   }
 
+  private consoleDelegate: ConsoleProvider = () => this._console;
+
   /**
    * Same as `super.startServer()`, but the method is private and doesn't allow
    * any changes to be made. This method is implemented  to set the connection
@@ -311,6 +329,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
     const connection = new GladiatorConnection(
       // @ts-ignore
       super.createRpcConnection(process),
+      await this.cli.getGladiatorFormat(),
       this.logger,
     );
     // @ts-ignore

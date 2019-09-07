@@ -17,7 +17,7 @@ const fs_1 = __importDefault(require("fs"));
 const path = __importStar(require("path"));
 const util_1 = require("util");
 const composed_document_1 = require("./composed-document");
-const cli = __importStar(require("./gladiator-cli-adapter"));
+const gladiator_cli_adapter_1 = require("./gladiator-cli-adapter");
 const gladiator_config_1 = require("./gladiator-config");
 const gladiator_connection_1 = require("./gladiator-connection");
 const server_settings_1 = require("./server-settings");
@@ -26,13 +26,15 @@ const exists = util_1.promisify(fs_1.default.exists);
 // @ts-ignore
 class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     constructor() {
-        super(...arguments);
+        super();
         this._connection = null;
         this._settings = server_settings_1.getDefaultSettings();
         this._configPath = null;
         this._subscriptions = new atom_1.CompositeDisposable();
         this._insertView = new ui_1.default();
         this._statusView = null;
+        this._console = null;
+        this.consoleDelegate = () => this._console;
         /**
          * Same as `super.startServer()`, but the method is private and doesn't allow
          * any changes to be made. This method is implemented  to set the connection
@@ -44,7 +46,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             super.captureServerErrors(process, projectPath);
             const connection = new gladiator_connection_1.GladiatorConnection(
             // @ts-ignore
-            super.createRpcConnection(process), this.logger);
+            super.createRpcConnection(process), await this.cli.getGladiatorFormat(), this.logger);
             // @ts-ignore
             this.preInitialization(connection);
             const initializeParams = this.getInitializeParams(projectPath, process);
@@ -95,56 +97,61 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             // @ts-ignore
             return newServer;
         };
+        this.cli = new gladiator_cli_adapter_1.GladiatorCliAdapter(this.consoleDelegate);
     }
     async activate(state) {
         super.activate();
         await atom_package_deps_1.install('gladiator', false);
         this._subscriptions.add(
         /* Registering file watcher related to .gladiator.yml files. */
-        atom.project.onDidChangeFiles(events => {
+        atom.workspace.onDidOpen(event => {
+            if (event.uri) {
+                this.findAndSetConfig();
+            }
+        }), atom.project.onDidChangeFiles(events => {
             for (const event of events) {
-                if (event.path.match(cli.CONFIG_FILE_REGEX)) {
+                if (event.path.match(gladiator_cli_adapter_1.CONFIG_FILE_REGEX)) {
                     this.findAndSetConfig();
                 }
             }
         }), atom.workspace.onDidChangeActiveTextEditor(editor => {
             this.findAndSetConfig();
         }), atom.commands.add('atom-workspace', {
-            'gladiator:generate-files': () => cli.generateFilesToDir(this._insertView),
+            'gladiator:generate-files': () => this.cli.generateFilesToDir(this._insertView),
         }), atom.commands.add('atom-workspace', {
-            'gladiator:pack-problemset': () => {
+            'gladiator:pack-problemset': async () => {
                 if (this._configPath) {
-                    cli.packProblemset(this._insertView, path.dirname(this._configPath));
+                    await this.cli.packProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.packProblemset(this._insertView);
+                    await this.cli.packProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:push-problemset': () => {
                 if (this._configPath) {
-                    cli.pushProblemset(this._insertView, path.dirname(this._configPath));
+                    this.cli.pushProblemset(this._insertView, path.dirname(this._configPath));
                 }
                 else {
-                    cli.pushProblemset(this._insertView);
+                    this.cli.pushProblemset(this._insertView);
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-pack': () => {
                 if (this._configPath) {
-                    cli.packDockerImage(path.dirname(this._configPath));
+                    this.cli.packDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.packDockerImage();
+                    this.cli.packDockerImage();
                 }
             },
         }), atom.commands.add('atom-workspace', {
             'gladiator:docker-image-build': () => {
                 if (this._configPath) {
-                    cli.buildDockerImage(path.dirname(this._configPath));
+                    this.cli.buildDockerImage(path.dirname(this._configPath));
                 }
                 else {
-                    cli.buildDockerImage();
+                    this.cli.buildDockerImage();
                 }
             },
         }));
@@ -156,6 +163,9 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     consumeStatusBar(statusBar) {
         this._statusView = new ui_1.GladiatorStatusView(statusBar);
         this.updateStatusBar();
+    }
+    consumeConsolePanel(consolePanel) {
+        this._console = consolePanel;
     }
     serialize() {
         return {
@@ -197,7 +207,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
             /* Nothing is open. */
             await this.unsetValues();
         }
-        else if (!editorPath.match(cli.CONFIG_FILE_REGEX)) {
+        else if (!editorPath.match(gladiator_cli_adapter_1.CONFIG_FILE_REGEX)) {
             return;
         }
         else if (this._connection &&
@@ -219,7 +229,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
         }
         else if (this._connection) {
             try {
-                const configPath = await cli.getConfigFilePath(true);
+                const configPath = await this.cli.getConfigFilePath(true);
                 const configValues = await gladiator_config_1.getConfigValues(configPath);
                 await this.setValues(configValues, configPath);
             }
@@ -260,9 +270,9 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     }
     async sendSettings(values) {
         this._settings.settings.yaml.schemas = {};
-        const configSchema = await gladiator_config_1.getConfigSchema();
+        const configSchema = await this.cli.getSchemaUri();
         if (configSchema) {
-            this._settings.settings.yaml.schemas[configSchema] = cli.CONFIG_FILE_NAME;
+            this._settings.settings.yaml.schemas[configSchema] = gladiator_cli_adapter_1.CONFIG_FILE_NAME;
         }
         if (values.problemsetSchema && values.problemsetPath) {
             this._settings.settings.yaml.schemas[values.problemsetSchema] =

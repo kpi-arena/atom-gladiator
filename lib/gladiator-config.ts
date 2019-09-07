@@ -7,12 +7,9 @@ import {
   YAMLNode,
 } from 'yaml-ast-parser';
 import {
-  getSchemaUri,
   PROBLEMSET_URL,
   VARIANTS_URL,
 } from './gladiator-cli-adapter';
-
-let configSchemaCache: string | null = null;
 
 export interface IConfigValues {
   apiUrl?: string;
@@ -32,18 +29,6 @@ export async function getConfigValues(path: string): Promise<IConfigValues> {
       }
     });
   });
-}
-
-export async function getConfigSchema(): Promise<string | null> {
-  if (configSchemaCache === null) {
-    try {
-      configSchemaCache = await getSchemaUri();
-    } catch {
-      configSchemaCache = null;
-    }
-  }
-
-  return configSchemaCache;
 }
 
 function readConfigValues(node: YAMLNode): IConfigValues {
