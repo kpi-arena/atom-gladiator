@@ -1,8 +1,8 @@
 {
   "name": "gladiator",
   "main": "./build/main.js",
-  "version": "0.1.2",
-  "description": "Extension providing support for wirting Gladiator configuration files.",
+  "version": "0.1.3",
+  "description": "Extension providing support for writing Gladiator configuration files.",
   "keywords": [
     "yaml",
     "ide-yaml",

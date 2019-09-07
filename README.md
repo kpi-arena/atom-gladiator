@@ -1,18 +1,16 @@
-*gladiator*'s goal is to fully support the creation of configration file of *Gladiator* test runner. This test runner operates at *Arena* platform and it's configuration files defines the problemset.
+The goal of this extension is to fully support the creation of configuration files for *Gladiator* test runner from the *Arena* automated assignment evaluation platform.
 
 # Dependencies
 
-- Python 3.6 or newer to run
+- Python 3.6 or newer to run `gladiator-cli` tool
 
 -  `gladiator-cli` installed
 
-Note: to install `gladiator-cli` execute the following command:
-
-```
-
-$ pip install --extra-index-url https://arena.kpi.fei.tuke.sk/pypi gladiator-cli
-
-```
+> Note: to install `gladiator-cli` execute the following command:
+>
+> ```
+> $ pip install --extra-index-url https://arena.kpi.fei.tuke.sk/pypi gladiator-cli
+> ```
 
 # Config file activation
 
