@@ -318,7 +318,7 @@ export class ScoreOutline {
 
       this._result.set(Convert.pathToUri(this._superDoc.rootPath), [
         DocumentSymbol.create(
-          `${this.getTitle(rootNode)}: ${totalTasks[1]}`,
+          `${this.getTitle(rootNode)} (${totalTasks[1]})`,
           undefined,
           SymbolKind.Class,
           Range.create(Position.create(0, 0), Position.create(0, 0)),
@@ -346,6 +346,11 @@ export class ScoreOutline {
           return;
         } else if (
           mapping.key.value === 'title' &&
+          mapping.value.kind === Kind.SCALAR
+        ) {
+          result = mapping.value.value as string;
+        } else if (
+          mapping.key.value === 'pid' &&
           mapping.value.kind === Kind.SCALAR
         ) {
           result = mapping.value.value as string;

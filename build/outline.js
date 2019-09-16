@@ -164,7 +164,7 @@ class ScoreOutline {
         if (tasks) {
             const totalTasks = this.parseTasks(tasks, atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath));
             this._result.set(atom_languageclient_1.Convert.pathToUri(this._superDoc.rootPath), [
-                vscode_languageserver_protocol_1.DocumentSymbol.create(`${this.getTitle(rootNode)}: ${totalTasks[1]}`, undefined, vscode_languageserver_protocol_1.SymbolKind.Class, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), totalTasks[0]),
+                vscode_languageserver_protocol_1.DocumentSymbol.create(`${this.getTitle(rootNode)} (${totalTasks[1]})`, undefined, vscode_languageserver_protocol_1.SymbolKind.Class, vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), vscode_languageserver_protocol_1.Range.create(vscode_languageserver_protocol_1.Position.create(0, 0), vscode_languageserver_protocol_1.Position.create(0, 0)), totalTasks[0]),
             ]);
         }
     }
@@ -184,6 +184,10 @@ class ScoreOutline {
                     return;
                 }
                 else if (mapping.key.value === 'title' &&
+                    mapping.value.kind === yaml_ast_parser_1.Kind.SCALAR) {
+                    result = mapping.value.value;
+                }
+                else if (mapping.key.value === 'pid' &&
                     mapping.value.kind === yaml_ast_parser_1.Kind.SCALAR) {
                     result = mapping.value.value;
                 }
