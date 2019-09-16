@@ -197,7 +197,7 @@ class GladiatorConfClient extends atom_languageclient_1.AutoLanguageClient {
     postInitialization(_server) {
         super.postInitialization(_server);
         this._connection = _server.connection;
-        // this.findAndSetConfig();
+        this.findAndSetConfig();
     }
     getGrammarScopes() {
         return ['source.yaml', 'source.yml'];

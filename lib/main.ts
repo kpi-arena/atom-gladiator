@@ -173,7 +173,7 @@ export class GladiatorConfClient extends AutoLanguageClient {
 
     this._connection = _server.connection as GladiatorConnection;
 
-    // this.findAndSetConfig();
+    this.findAndSetConfig();
   }
 
   public getGrammarScopes(): string[] {
